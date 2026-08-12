@@ -152,11 +152,55 @@ export default class GameScene extends Phaser.Scene {
     // =========================================================
 
     loadBackgroundAssets() {
+    const backgrounds = [
+        {
+            key: "background-0",
+            path: "/assets/backgrounds/fondo.png"
+        },
+        {
+            key: "background-1",
+            path: "/assets/backgrounds/fondo1.png"
+        },
+        {
+            key: "background-2",
+            path: "/assets/backgrounds/fondo2.png"
+        },
+        {
+            key: "background-3",
+            path: "/assets/backgrounds/fondo3.png"
+        },
+        {
+            key: "background-4",
+            path: "/assets/backgrounds/fondo4.png"
+        },
+        {
+            key: "background-5",
+            path: "/assets/backgrounds/fondo5.png"
+        },
+        {
+            key: "background-6",
+            path: "/assets/backgrounds/fondo6.png"
+        },
+        {
+            key: "background-7",
+            path: "/assets/backgrounds/fondo7.png"
+        },
+        {
+            key: "background-8",
+            path: "/assets/backgrounds/fondo8.png"
+        }
+    ];
+
+    for (
+        const background
+        of backgrounds
+    ) {
         this.load.image(
-            "background",
-            "/assets/backgrounds/fondo.png"
+            background.key,
+            background.path
         );
     }
+}
 
     // =========================================================
     // Recursos del jugador
@@ -360,19 +404,28 @@ export default class GameScene extends Phaser.Scene {
         // =====================================================
 
         this.backgroundManager =
-            new BackgroundManager(
-                this,
-                {
-                    textureKey:
-                        "background",
+    new BackgroundManager(
+        this,
+        {
+            textureKeys: [
+                "background-0",
+                "background-1",
+                "background-2",
+                "background-3",
+                "background-4",
+                "background-5",
+                "background-6",
+                "background-7",
+                "background-8"
+            ],
 
-                    speed:
-                        35,
+            speed:
+                35,
 
-                    depth:
-                        -100
-                }
-            );
+            depth:
+                -100
+        }
+    );
 
         this.backgroundManager.create();
 

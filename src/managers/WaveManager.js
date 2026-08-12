@@ -268,7 +268,10 @@ export default class WaveManager {
         this.stop();
 
         this.currentWave = 0;
-        this.totalEnemiesInCurrentWave = 0;
+
+        this.totalEnemiesInCurrentWave =
+            0;
+
         this.pendingSpawns = 0;
 
         this.hasFinished = false;
@@ -305,6 +308,7 @@ export default class WaveManager {
                 this.hasReachedMaximumWaves()
             ) {
                 this.finish();
+
                 return;
             }
 
@@ -464,129 +468,168 @@ export default class WaveManager {
     // Aparición
     // =========================================================
 
+    getRandomSpawnSide() {
+        return Math.random() < 0.5
+            ? "LEFT"
+            : "RIGHT";
+    }
+
     spawnEnemy() {
-    if (
-        this.isDestroyed ||
-        !this.scene ||
-        !this.enemyManager
-    ) {
-        return null;
-    }
+        if (
+            this.isDestroyed ||
+            !this.scene ||
+            !this.enemyManager
+        ) {
+            return null;
+        }
 
-    const camera =
-        this.scene.cameras?.main;
+        const camera =
+            this.scene.cameras?.main;
 
-    if (!camera) {
-        return null;
-    }
+        if (!camera) {
+            return null;
+        }
 
-    /*
-     * Borde derecho real del área visible.
-     *
-     * No se usa scene.scale.width porque puede no coincidir
-     * temporalmente con el viewport de la cámara al iniciar.
-     */
-    const visibleRight =
-        camera.scrollX +
-        camera.width;
+        /*
+         * Usamos los límites reales de la cámara.
+         *
+         * Esto evita depender de scene.scale.width,
+         * que puede diferir temporalmente durante
+         * la carga o el resize en dispositivos móviles.
+         */
+        const visibleLeft =
+            camera.scrollX;
 
-    const randomOffset =
-        Phaser.Math.Between(
-            0,
-            Math.floor(
-                this.spawnVariation
-            )
-        );
+        const visibleRight =
+            camera.scrollX +
+            camera.width;
 
-    const spawnX =
-        visibleRight +
-        this.spawnOutsideDistance +
-        randomOffset;
+        /*
+         * Cada enemigo decide de qué lado aparecer.
+         *
+         * LEFT:
+         *   aparece fuera del borde izquierdo.
+         *
+         * RIGHT:
+         *   aparece fuera del borde derecho.
+         */
+        const spawnSide =
+            this.getRandomSpawnSide();
 
-    const spawnY =
-        this.enemyManager
-            .getGroundSurfaceY() -
-        5;
+        const randomOffset =
+            Phaser.Math.Between(
+                0,
+                Math.floor(
+                    this.spawnVariation
+                )
+            );
 
-    const settings =
-        GameSettings.soldier ?? {};
+        let spawnX;
 
-    const enemy =
-        this.enemyManager.spawnSoldier(
-            spawnX,
-            spawnY,
+        if (spawnSide === "LEFT") {
+            spawnX =
+                visibleLeft -
+                this.spawnOutsideDistance -
+                randomOffset;
+        } else {
+            spawnX =
+                visibleRight +
+                this.spawnOutsideDistance +
+                randomOffset;
+        }
+
+        const spawnY =
+            this.enemyManager
+                .getGroundSurfaceY() -
+            5;
+
+        const settings =
+            GameSettings.soldier ?? {};
+
+        const enemy =
+            this.enemyManager.spawnSoldier(
+                spawnX,
+                spawnY,
+                {
+                    /*
+                     * Este dato será utilizado por
+                     * EnemyManager y SoldierAI.
+                     */
+                    spawnSide,
+
+                    maximumHealth:
+                        this.getEnemyHealthForCurrentWave(),
+
+                    moveSpeed:
+                        this.getEnemySpeedForCurrentWave(),
+
+                    attackDamage:
+                        settings.attackDamage ??
+                        1,
+
+                    scoreValue:
+                        settings.scoreValue ??
+                        100,
+
+                    detectionRange:
+                        settings.detectionRange ??
+                        1200,
+
+                    attackRange:
+                        settings.attackRange ??
+                        115,
+
+                    attackCooldown:
+                        settings.attackCooldown ??
+                        1300,
+
+                    attackHitboxWidth:
+                        settings.attackHitboxWidth ??
+                        125,
+
+                    attackHitboxHeight:
+                        settings.attackHitboxHeight ??
+                        58,
+
+                    attackHitboxOffset:
+                        settings.attackHitboxOffset ??
+                        15,
+
+                    decisionInterval:
+                        settings.decisionInterval ??
+                        120,
+
+                    activeAreaMargin:
+                        settings.activeAreaMargin ??
+                        350,
+
+                    entryPadding:
+                        settings.entryPadding ??
+                        55,
+
+                    deathScaleMultiplier:
+                        settings.deathScaleMultiplier ??
+                        0.82
+                }
+            );
+
+        console.log(
+            "[WaveManager] Enemigo generado:",
             {
-                maximumHealth:
-                    this.getEnemyHealthForCurrentWave(),
-
-                moveSpeed:
-                    this.getEnemySpeedForCurrentWave(),
-
-                attackDamage:
-                    settings.attackDamage ??
-                    1,
-
-                scoreValue:
-                    settings.scoreValue ??
-                    100,
-
-                detectionRange:
-                    settings.detectionRange ??
-                    1200,
-
-                attackRange:
-                    settings.attackRange ??
-                    115,
-
-                attackCooldown:
-                    settings.attackCooldown ??
-                    1300,
-
-                attackHitboxWidth:
-                    settings.attackHitboxWidth ??
-                    125,
-
-                attackHitboxHeight:
-                    settings.attackHitboxHeight ??
-                    58,
-
-                attackHitboxOffset:
-                    settings.attackHitboxOffset ??
-                    15,
-
-                decisionInterval:
-                    settings.decisionInterval ??
-                    120,
-
-                activeAreaMargin:
-                    settings.activeAreaMargin ??
-                    350,
-
-                entryPadding:
-                    settings.entryPadding ??
-                    55,
-
-                deathScaleMultiplier:
-                    settings.deathScaleMultiplier ??
-                    0.82
+                spawnSide,
+                spawnX,
+                spawnY,
+                visibleLeft,
+                visibleRight,
+                cameraWidth:
+                    camera.width,
+                scaleWidth:
+                    this.scene.scale.width
             }
         );
 
-    console.log(
-        "[WaveManager] Enemigo generado:",
-        {
-            spawnX,
-            spawnY,
-            visibleRight,
-            cameraWidth:
-                camera.width,
-            scaleWidth:
-                this.scene.scale.width
-        }
-    );
-
-    return enemy;
-}
+        return enemy;
+    }
 
     // =========================================================
     // Dificultad
@@ -632,7 +675,8 @@ export default class WaveManager {
                 this.speedIncreasePerWave
             );
 
-        return baseSpeed + bonus;
+        return baseSpeed +
+            bonus;
     }
 
     // =========================================================

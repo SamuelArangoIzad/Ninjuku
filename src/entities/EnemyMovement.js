@@ -27,7 +27,7 @@ export default class EnemyMovement {
         if (
             !force &&
             this.enemy.state ===
-                nextState
+            nextState
         ) {
             return false;
         }
@@ -57,7 +57,7 @@ export default class EnemyMovement {
     }
 
     // =========================================================
-    // Movimiento
+    // Idle
     // =========================================================
 
     setIdle() {
@@ -67,19 +67,15 @@ export default class EnemyMovement {
 
         if (
             this.isDestroyed ||
+            !this.enemy ||
             !sprite?.body
         ) {
             return false;
         }
 
-        if (
-            sprite.body.velocity.x !==
+        sprite.body.setVelocityX(
             0
-        ) {
-            sprite.body.setVelocityX(
-                0
-            );
-        }
+        );
 
         if (
             this.enemy.isDead ||
@@ -95,6 +91,10 @@ export default class EnemyMovement {
 
         return true;
     }
+
+    // =========================================================
+    // Caminar
+    // =========================================================
 
     setWalking(direction) {
         if (
@@ -115,29 +115,43 @@ export default class EnemyMovement {
 
         const sprite =
             this.enemy
-                .getSprite?.();
+                ?.getSprite?.();
 
-        if (!sprite?.body) {
+        if (
+            !sprite?.body
+        ) {
             return false;
         }
 
+        /*
+         * IMPORTANTE:
+         *
+         * La dirección lógica, visual y física
+         * deben actualizarse juntas.
+         */
         this.setFacingDirection(
             direction
         );
 
+        const speed =
+            this.enemy
+                ?.getMoveSpeed?.() ??
+            0;
+
         const velocityX =
             direction *
-            this.enemy
-                .getMoveSpeed();
+            speed;
 
-        if (
-            sprite.body.velocity.x !==
+        /*
+         * direction = -1
+         * velocidad hacia la izquierda
+         *
+         * direction = 1
+         * velocidad hacia la derecha
+         */
+        sprite.body.setVelocityX(
             velocityX
-        ) {
-            sprite.body.setVelocityX(
-                velocityX
-            );
-        }
+        );
 
         this.changeState(
             "WALK"
@@ -145,6 +159,10 @@ export default class EnemyMovement {
 
         return true;
     }
+
+    // =========================================================
+    // Detener movimiento
+    // =========================================================
 
     stop() {
         const sprite =
@@ -201,22 +219,33 @@ export default class EnemyMovement {
             return false;
         }
 
-        if (
+        const sprite =
             this.enemy
-                .facingDirection ===
-            direction
-        ) {
+                ?.getSprite?.();
+
+        if (!sprite) {
             return false;
         }
 
+        /*
+         * Siempre sincronizamos la dirección lógica
+         * con la orientación visual.
+         *
+         * No dependemos de si facingDirection
+         * ya tenía el mismo valor.
+         */
         this.enemy.facingDirection =
             direction;
 
-        this.enemy
-            .getSprite?.()
-            ?.setFlipX(
-                direction < 0
-            );
+        /*
+         * Según la configuración actual del proyecto:
+         *
+         * -1 = mirar izquierda = flipX true
+         *  1 = mirar derecha   = flipX false
+         */
+        sprite.setFlipX(
+            direction === -1
+        );
 
         return true;
     }
@@ -225,7 +254,7 @@ export default class EnemyMovement {
         return (
             this.enemy
                 ?.facingDirection ??
-            1
+            -1
         );
     }
 
@@ -243,12 +272,11 @@ export default class EnemyMovement {
 
         const sprite =
             this.enemy
-                .getSprite?.();
+                ?.getSprite?.();
 
         const facingDirection =
             configuration
-                .facingDirection ===
-            1
+                .facingDirection === 1
                 ? 1
                 : -1;
 
@@ -256,9 +284,12 @@ export default class EnemyMovement {
             facingDirection;
 
         if (sprite) {
+            /*
+             * Sincronizamos inmediatamente
+             * la orientación visual.
+             */
             sprite.setFlipX(
-                facingDirection <
-                    0
+                facingDirection === -1
             );
 
             if (sprite.body) {
@@ -292,9 +323,13 @@ export default class EnemyMovement {
     // =========================================================
 
     destroy() {
-        if (this.isDestroyed) {
+        if (
+            this.isDestroyed
+        ) {
             return;
         }
+
+        this.stopAllMovement();
 
         this.isDestroyed =
             true;

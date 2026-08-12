@@ -3,26 +3,78 @@ export default class BackgroundManager {
         scene,
         configuration = {}
     ) {
-        this.scene = scene;
+        this.scene =
+            scene ?? null;
 
-        this.textureKey =
-            configuration.textureKey ??
-            "background";
+        // =====================================================
+        // Texturas
+        // =====================================================
+
+        /*
+         * Ahora se recibe una secuencia de fondos.
+         *
+         * Ejemplo:
+         *
+         * background-0
+         * background-1
+         * background-2
+         * ...
+         */
+        this.textureKeys =
+            Array.isArray(
+                configuration.textureKeys
+            ) &&
+            configuration.textureKeys.length > 0
+                ? configuration.textureKeys
+                : [
+                    configuration.textureKey ??
+                    "background"
+                ];
+
+        /*
+         * Índice de la siguiente textura que debe entrar.
+         */
+        this.nextTextureIndex =
+            0;
+
+        // =====================================================
+        // Configuración visual
+        // =====================================================
 
         this.speed =
-            configuration.speed ??
-            35;
+            Number.isFinite(
+                Number(configuration.speed)
+            )
+                ? Math.max(
+                    0,
+                    Number(configuration.speed)
+                )
+                : 35;
 
         this.depth =
-            configuration.depth ??
-            -100;
+            Number.isFinite(
+                Number(configuration.depth)
+            )
+                ? Number(configuration.depth)
+                : -100;
 
-        this.backgrounds = [];
+        // =====================================================
+        // Fondos activos
+        // =====================================================
 
-        this.backgroundWidth = 0;
-        this.backgroundScale = 1;
+        /*
+         * Se mantienen dos fondos:
+         *
+         * [ fondo actual ][ siguiente fondo ]
+         *
+         * Cuando el primero sale por la izquierda,
+         * se reutiliza y recibe la siguiente textura.
+         */
+        this.backgrounds =
+            [];
 
-        this.isDestroyed = false;
+        this.isDestroyed =
+            false;
     }
 
     // =========================================================
@@ -34,14 +86,198 @@ export default class BackgroundManager {
             this.isDestroyed ||
             !this.scene
         ) {
-            return;
+            return false;
         }
 
         this.destroyImages();
 
+        if (
+            !this.validateTextures()
+        ) {
+            return false;
+        }
+
+        const screenHeight =
+            Math.max(
+                1,
+                this.scene.scale.height
+            );
+
+        const centerY =
+            screenHeight / 2;
+
+        /*
+         * Reiniciamos la secuencia.
+         */
+        this.nextTextureIndex =
+            0;
+
+        /*
+         * Primer fondo.
+         */
+        const firstTexture =
+            this.getNextTextureKey();
+
+        const first =
+            this.createImage(
+                0,
+                centerY,
+                firstTexture
+            );
+
+        /*
+         * Segundo fondo inmediatamente después
+         * del primero.
+         */
+        const secondTexture =
+            this.getNextTextureKey();
+
+        const second =
+            this.createImage(
+                first.displayWidth,
+                centerY,
+                secondTexture
+            );
+
+        if (
+            !first ||
+            !second
+        ) {
+            this.destroyImages();
+
+            return false;
+        }
+
+        this.backgrounds = [
+            first,
+            second
+        ];
+
+        return true;
+    }
+
+    // =========================================================
+    // Validación de texturas
+    // =========================================================
+
+    validateTextures() {
+        if (
+            !this.scene?.textures ||
+            this.textureKeys.length === 0
+        ) {
+            return false;
+        }
+
+        for (
+            const textureKey
+            of this.textureKeys
+        ) {
+            const texture =
+                this.scene.textures.get(
+                    textureKey
+                );
+
+            if (
+                !texture ||
+                texture.key ===
+                    "__MISSING"
+            ) {
+                console.error(
+                    `[BackgroundManager] ` +
+                    `No existe la textura: ` +
+                    `${textureKey}`
+                );
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // =========================================================
+    // Secuencia de texturas
+    // =========================================================
+
+    getNextTextureKey() {
+        if (
+            this.textureKeys.length === 0
+        ) {
+            return null;
+        }
+
+        const textureKey =
+            this.textureKeys[
+                this.nextTextureIndex
+            ];
+
+        this.nextTextureIndex =
+            (
+                this.nextTextureIndex +
+                1
+            ) %
+            this.textureKeys.length;
+
+        return textureKey;
+    }
+
+    // =========================================================
+    // Creación de imagen
+    // =========================================================
+
+    createImage(
+        x,
+        y,
+        textureKey
+    ) {
+        if (
+            !textureKey ||
+            !this.scene
+        ) {
+            return null;
+        }
+
+        const image =
+            this.scene.add.image(
+                x,
+                y,
+                textureKey
+            );
+
+        image
+            .setOrigin(
+                0,
+                0.5
+            )
+            .setDepth(
+                this.depth
+            )
+            .setScrollFactor(
+                0
+            );
+
+        this.scaleBackground(
+            image
+        );
+
+        return image;
+    }
+
+    // =========================================================
+    // Escala responsive
+    // =========================================================
+
+    scaleBackground(image) {
+        if (
+            !image ||
+            !this.scene
+        ) {
+            return false;
+        }
+
         const texture =
             this.scene.textures.get(
-                this.textureKey
+                image.texture.key
             );
 
         if (
@@ -49,29 +285,17 @@ export default class BackgroundManager {
             texture.key ===
                 "__MISSING"
         ) {
-            console.error(
-                `[BackgroundManager] ` +
-                `No existe la textura: ` +
-                `${this.textureKey}`
-            );
-
-            return;
+            return false;
         }
 
         const source =
             texture.getSourceImage();
 
         if (
-            !source ||
-            !source.width ||
-            !source.height
+            !source?.width ||
+            !source?.height
         ) {
-            console.error(
-                "[BackgroundManager] " +
-                "La textura no tiene dimensiones válidas."
-            );
-
-            return;
+            return false;
         }
 
         const screenWidth =
@@ -87,10 +311,11 @@ export default class BackgroundManager {
             );
 
         /*
-         * Comportamiento tipo cover:
-         * el fondo cubre toda la pantalla sin pilares.
+         * Cover:
+         * cada imagen cubre toda la altura o anchura
+         * necesaria sin dejar espacios.
          */
-        this.backgroundScale =
+        const scale =
             Math.max(
                 screenWidth /
                     source.width,
@@ -99,49 +324,41 @@ export default class BackgroundManager {
                     source.height
             );
 
-        this.backgroundWidth =
-            source.width *
-            this.backgroundScale;
+        image.setScale(
+            scale
+        );
 
-        const centerY =
-            screenHeight / 2;
-
-        const first =
-            this.createImage(
-                0,
-                centerY
-            );
-
-        const second =
-            this.createImage(
-                this.backgroundWidth,
-                centerY
-            );
-
-        this.backgrounds = [
-            first,
-            second
-        ];
+        return true;
     }
 
-    createImage(x, y) {
-        return this.scene.add
-            .image(
-                x,
-                y,
-                this.textureKey
-            )
-            .setOrigin(
-                0,
-                0.5
-            )
-            .setScale(
-                this.backgroundScale
-            )
-            .setDepth(
-                this.depth
-            )
-            .setScrollFactor(0);
+    // =========================================================
+    // Cambio de textura
+    // =========================================================
+
+    assignNextTexture(background) {
+        if (
+            !background ||
+            this.isDestroyed
+        ) {
+            return false;
+        }
+
+        const textureKey =
+            this.getNextTextureKey();
+
+        if (!textureKey) {
+            return false;
+        }
+
+        background.setTexture(
+            textureKey
+        );
+
+        this.scaleBackground(
+            background
+        );
+
+        return true;
     }
 
     // =========================================================
@@ -162,12 +379,15 @@ export default class BackgroundManager {
                 : 0;
 
         /*
-         * Se limita el delta para evitar saltos enormes cuando
-         * la pestaña vuelve después de estar suspendida.
+         * Evita saltos enormes cuando el navegador
+         * estuvo suspendido.
          */
         const clampedDelta =
             Math.min(
-                safeDelta,
+                Math.max(
+                    0,
+                    safeDelta
+                ),
                 100
             );
 
@@ -181,11 +401,20 @@ export default class BackgroundManager {
         const [
             first,
             second
-        ] = this.backgrounds;
+        ] =
+            this.backgrounds;
 
-        first.x -= movement;
-        second.x -= movement;
+        first.x -=
+            movement;
 
+        second.x -=
+            movement;
+
+        /*
+         * Si alguno salió completamente de la pantalla,
+         * pasa al final y recibe el siguiente fondo
+         * de la secuencia.
+         */
         this.repositionIfOutside(
             first,
             second
@@ -197,21 +426,55 @@ export default class BackgroundManager {
         );
     }
 
+    // =========================================================
+    // Reposicionamiento
+    // =========================================================
+
     repositionIfOutside(
         background,
         otherBackground
     ) {
         if (
+            !background ||
+            !otherBackground
+        ) {
+            return false;
+        }
+
+        /*
+         * Mientras todavía tenga una parte visible,
+         * no hacemos nada.
+         */
+        if (
             background.x +
-                this.backgroundWidth >
+            background.displayWidth >
             0
         ) {
-            return;
+            return false;
         }
+
+        /*
+         * Se reutiliza la imagen que salió.
+         *
+         * Primero cambiamos su textura por la siguiente:
+         *
+         * fondo
+         * → fondo1
+         * → fondo2
+         * → ...
+         *
+         * Después la colocamos justo después
+         * del fondo que sigue visible.
+         */
+        this.assignNextTexture(
+            background
+        );
 
         background.x =
             otherBackground.x +
-            this.backgroundWidth;
+            otherBackground.displayWidth;
+
+        return true;
     }
 
     // =========================================================
@@ -223,14 +486,15 @@ export default class BackgroundManager {
             this.isDestroyed ||
             !this.scene
         ) {
-            return;
+            return false;
         }
 
         /*
-         * El resize no necesita lógica duplicada.
-         * Se vuelven a calcular escala y posiciones.
+         * Conservamos la secuencia desde el inicio
+         * para evitar posiciones incorrectas cuando
+         * cambian las dimensiones.
          */
-        this.create();
+        return this.create();
     }
 
     // =========================================================
@@ -246,7 +510,7 @@ export default class BackgroundManager {
                 validSpeed
             )
         ) {
-            return;
+            return false;
         }
 
         this.speed =
@@ -254,14 +518,44 @@ export default class BackgroundManager {
                 0,
                 validSpeed
             );
+
+        return true;
     }
 
     getSpeed() {
         return this.speed;
     }
 
+    setTextureKeys(textureKeys) {
+        if (
+            this.isDestroyed ||
+            !Array.isArray(
+                textureKeys
+            ) ||
+            textureKeys.length === 0
+        ) {
+            return false;
+        }
+
+        this.textureKeys =
+            [
+                ...textureKeys
+            ];
+
+        this.nextTextureIndex =
+            0;
+
+        return true;
+    }
+
+    getTextureKeys() {
+        return [
+            ...this.textureKeys
+        ];
+    }
+
     // =========================================================
-    // Destrucción
+    // Destrucción de imágenes
     // =========================================================
 
     destroyImages() {
@@ -272,21 +566,33 @@ export default class BackgroundManager {
             background?.destroy();
         }
 
-        this.backgrounds = [];
+        this.backgrounds =
+            [];
     }
 
+    // =========================================================
+    // Destrucción definitiva
+    // =========================================================
+
     destroy() {
-        if (this.isDestroyed) {
+        if (
+            this.isDestroyed
+        ) {
             return;
         }
 
-        this.isDestroyed = true;
+        this.isDestroyed =
+            true;
 
         this.destroyImages();
 
-        this.backgroundWidth = 0;
-        this.backgroundScale = 1;
+        this.textureKeys =
+            [];
 
-        this.scene = null;
+        this.nextTextureIndex =
+            0;
+
+        this.scene =
+            null;
     }
 }
