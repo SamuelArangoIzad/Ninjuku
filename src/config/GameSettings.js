@@ -12,9 +12,25 @@ const GameSettings = {
     // =========================================================
 
     background: {
-        textureKey: "background",
+        textureKeys: [
+            "background-1",
+            "background-2",
+            "background-3",
+            "background-4",
+            "background-5",
+            "background-6",
+            "background-7",
+            "background-8"
+        ],
         speed: 35,
-        depth: -100
+        depth: -100,
+
+        /*
+         * Fracción del fondo que dura la disolución hacia el
+         * siguiente. Subirlo suaviza más la entrada y la salida de
+         * la mezcla. El máximo admitido es 0.49.
+         */
+        blendRatio: 0.48
     },
 
     // =========================================================

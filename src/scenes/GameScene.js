@@ -37,6 +37,22 @@ import PerformanceMonitor
     from "../debug/PerformanceMonitor.js";
 
 
+/*
+ * Orden en el que se van encadenando los fondos. Al llegar al final
+ * vuelve a empezar por el primero.
+ */
+const BACKGROUND_KEYS = [
+    "background-1",
+    "background-2",
+    "background-3",
+    "background-4",
+    "background-5",
+    "background-6",
+    "background-7",
+    "background-8"
+];
+
+
 export default class GameScene extends Phaser.Scene {
     constructor() {
         super({
@@ -152,9 +168,48 @@ export default class GameScene extends Phaser.Scene {
     // =========================================================
 
     loadBackgroundAssets() {
+        /*
+         * Los fondos se recorren en secuencia. Para añadir el fondo 3
+         * basta con cargarlo aquí y sumar su clave a BACKGROUND_KEYS.
+         */
         this.load.image(
-            "background",
+            "background-1",
             "/assets/backgrounds/fondo.png"
+        );
+
+        this.load.image(
+            "background-2",
+            "/assets/backgrounds/fondo2.png"
+        );
+
+        this.load.image(
+            "background-3",
+            "/assets/backgrounds/fondo3.png"
+        );
+
+        this.load.image(
+            "background-4",
+            "/assets/backgrounds/fondo4.png"
+        );
+
+        this.load.image(
+            "background-5",
+            "/assets/backgrounds/fondo5.png"
+        );
+
+        this.load.image(
+            "background-6",
+            "/assets/backgrounds/fondo6.png"
+        );
+
+        this.load.image(
+            "background-7",
+            "/assets/backgrounds/fondo7.png"
+        );
+
+        this.load.image(
+            "background-8",
+            "/assets/backgrounds/fondo8.png"
         );
     }
 
@@ -363,8 +418,8 @@ export default class GameScene extends Phaser.Scene {
             new BackgroundManager(
                 this,
                 {
-                    textureKey:
-                        "background",
+                    textureKeys:
+                        BACKGROUND_KEYS,
 
                     speed:
                         35,

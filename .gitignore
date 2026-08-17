@@ -1,0 +1,8 @@
+# Dependencias
+node_modules/
+
+# Build
+dist/
+
+# Herramientas locales del editor
+.claude/
