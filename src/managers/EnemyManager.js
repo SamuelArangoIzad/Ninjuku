@@ -40,8 +40,6 @@ export default class EnemyManager {
 
         /*
          * enemy -> collider con el suelo.
-         *
-         * Solo existen colliders para enemigos activos.
          */
         this.groundColliders =
             new Map();
@@ -76,12 +74,6 @@ export default class EnemyManager {
                 350
             );
 
-        /*
-         * Cantidad máxima de enemigos inactivos conservados.
-         *
-         * Los enemigos adicionales se destruyen definitivamente
-         * para impedir que el pool crezca sin límite.
-         */
         this.maximumPoolSize =
             Math.max(
                 0,
@@ -94,14 +86,21 @@ export default class EnemyManager {
                 )
             );
 
-        /*
-         * Permite desactivar temporalmente el pooling sin
-         * modificar Enemy ni EnemyCombat.
-         */
         this.poolingEnabled =
             configuration.poolingEnabled ??
             enemySettings.poolingEnabled ??
             true;
+
+        /*
+         * Distancia adicional fuera de la pantalla
+         * utilizada para la aparición de enemigos.
+         */
+        this.spawnOffset =
+            this.normalizeNonNegativeNumber(
+                configuration.spawnOffset ??
+                    enemySettings.spawnOffset,
+                35
+            );
 
         // =====================================================
         // Estado
@@ -140,6 +139,26 @@ export default class EnemyManager {
                 fallback
             )
         );
+    }
+
+    normalizeSpawnSide(
+        side
+    ) {
+        if (
+            side === "LEFT" ||
+            side === "left"
+        ) {
+            return "LEFT";
+        }
+
+        if (
+            side === "RIGHT" ||
+            side === "right"
+        ) {
+            return "RIGHT";
+        }
+
+        return "RIGHT";
     }
 
     // =========================================================
@@ -202,13 +221,18 @@ export default class EnemyManager {
             return null;
         }
 
-        const visibleRight =
-            this.getVisibleRight();
+        const spawnSide =
+            this.normalizeSpawnSide(
+                configuration.spawnSide ??
+                    configuration.side
+            );
 
         const validX =
             Number.isFinite(x)
                 ? x
-                : visibleRight + 35;
+                : this.getSpawnX(
+                    spawnSide
+                );
 
         const validY =
             Number.isFinite(y)
@@ -218,31 +242,31 @@ export default class EnemyManager {
                     5
                 );
 
+        /*
+         * La dirección de entrada se conserva dentro de la
+         * configuración para Enemy y SoldierAI.
+         */
+        const enemyConfiguration = {
+            ...configuration,
+
+            spawnSide
+        };
+
         const enemy =
             this.acquireEnemy(
                 validX,
                 validY,
-                configuration
+                enemyConfiguration
             );
 
         if (!enemy) {
             return null;
         }
 
-        /*
-         * Se añade únicamente a la colección activa.
-         *
-         * push() conserva la referencia del arreglo utilizada
-         * por CombatSystem.
-         */
         this.enemies.push(
             enemy
         );
 
-        /*
-         * HealthBarSystem crea una suscripción nueva para este
-         * ciclo de actividad.
-         */
         this.healthBarSystem
             ?.addEnemy?.(
                 enemy
@@ -253,6 +277,46 @@ export default class EnemyManager {
         );
 
         return enemy;
+    }
+
+    getSpawnX(
+        spawnSide
+    ) {
+        const camera =
+            this.scene
+                ?.cameras
+                ?.main;
+
+        const visibleLeft =
+            camera?.scrollX ??
+            0;
+
+        const visibleRight =
+            camera
+                ? (
+                    camera.scrollX +
+                    camera.width
+                )
+                : (
+                    this.scene
+                        ?.scale
+                        ?.width ??
+                    1
+                );
+
+        if (
+            spawnSide === "LEFT"
+        ) {
+            return (
+                visibleLeft -
+                this.spawnOffset
+            );
+        }
+
+        return (
+            visibleRight +
+            this.spawnOffset
+        );
     }
 
     acquireEnemy(
@@ -287,10 +351,6 @@ export default class EnemyManager {
                 );
 
             if (!activated) {
-                /*
-                 * Si una instancia del pool no puede reactivarse,
-                 * se elimina definitivamente y se crea otra.
-                 */
                 enemy?.destroy?.();
 
                 enemy =
@@ -311,10 +371,6 @@ export default class EnemyManager {
             return null;
         }
 
-        /*
-         * Cuando finalice la animación y el fade de muerte,
-         * EnemyCombat solicitará la devolución al pool.
-         */
         enemy.setOnDeathFinished?.(
             this.handleEnemyDeathFinished,
             this
@@ -353,11 +409,6 @@ export default class EnemyManager {
         return enemy;
     }
 
-    /*
-     * Método con sintaxis de campo para conservar automáticamente
-     * la referencia correcta de EnemyManager cuando EnemyCombat
-     * lo ejecuta como callback.
-     */
     handleEnemyDeathFinished = (
         enemy
     ) => {
@@ -390,9 +441,6 @@ export default class EnemyManager {
                 enemy
             );
 
-        /*
-         * Evita liberar dos veces la misma instancia.
-         */
         if (index < 0) {
             return false;
         }
@@ -401,9 +449,6 @@ export default class EnemyManager {
             enemy
         );
 
-        /*
-         * Se elimina de la colección activa sin reemplazarla.
-         */
         this.enemies.splice(
             index,
             1
@@ -428,9 +473,6 @@ export default class EnemyManager {
             return true;
         }
 
-        /*
-         * Protección contra entradas duplicadas.
-         */
         if (
             !this.enemyPool.includes(
                 enemy
@@ -493,18 +535,11 @@ export default class EnemyManager {
             enemy
         );
 
-        /*
-         * Limpia los registros de ataques procesados.
-         */
         this.combatSystem
             ?.removeEnemy?.(
                 enemy
             );
 
-        /*
-         * Elimina la barra y desuscribe HealthComponent.
-         * Al reactivar el enemigo se registrará otra vez.
-         */
         this.healthBarSystem
             ?.removeEnemy?.(
                 enemy
@@ -554,8 +589,7 @@ export default class EnemyManager {
                 );
 
             /*
-             * El estado ENTERING tiene prioridad sobre culling.
-             * Si se pausara fuera de pantalla, nunca podría entrar.
+             * ENTERING tiene prioridad sobre culling.
              */
             if (isEntering) {
                 this.updateEnteringEnemy(
@@ -613,21 +647,37 @@ export default class EnemyManager {
             return;
         }
 
+        const spawnSide =
+            this.normalizeSpawnSide(
+                enemy.spawnSide ??
+                    enemy.getSpawnSide?.()
+            );
+
+        const visibleLeft =
+            camera.scrollX;
+
         const visibleRight =
             camera.scrollX +
             camera.width;
 
         const isOutside =
-            sprite.x >
-            visibleRight;
+            spawnSide === "LEFT"
+                ? (
+                    sprite.x <
+                    visibleLeft
+                )
+                : (
+                    sprite.x >
+                    visibleRight
+                );
 
         if (isOutside) {
             /*
-             * Mientras permanece fuera de pantalla:
+             * Mientras el enemigo está fuera de pantalla:
              *
-             * - se desactiva gravedad;
-             * - se mantiene la altura del suelo;
-             * - la IA conserva el movimiento horizontal.
+             * - no cae;
+             * - mantiene la altura correcta;
+             * - conserva el movimiento horizontal.
              */
             if (
                 sprite.body.allowGravity
@@ -766,7 +816,9 @@ export default class EnemyManager {
     }
 
     activateEnemyAI(enemy) {
-        if (!enemy?.isAlive?.()) {
+        if (
+            !enemy?.isAlive?.()
+        ) {
             return false;
         }
 
@@ -801,11 +853,6 @@ export default class EnemyManager {
             const enemy =
                 this.enemies[index];
 
-            /*
-             * Un enemigo muerto continúa activo mientras reproduce
-             * su animación y fade. EnemyCombat lo liberará cuando
-             * finalice la secuencia.
-             */
             if (
                 enemy &&
                 !enemy.isDestroyed &&
@@ -823,9 +870,6 @@ export default class EnemyManager {
                 1
             );
 
-            /*
-             * Las instancias destruidas no pueden volver al pool.
-             */
             if (
                 enemy &&
                 !enemy.isDestroyed
@@ -952,10 +996,6 @@ export default class EnemyManager {
             return;
         }
 
-        /*
-         * Solo los enemigos activos necesitan actualizar escala.
-         * Los integrantes del pool se recalculan en activate().
-         */
         for (
             const enemy
             of this.enemies
@@ -986,6 +1026,10 @@ export default class EnemyManager {
             this.scene
                 ?.cameras
                 ?.main;
+
+        const visibleLeft =
+            camera?.scrollX ??
+            0;
 
         const visibleRight =
             camera
@@ -1018,18 +1062,38 @@ export default class EnemyManager {
                 currentGroundY -
                 distanceFromGround;
 
+            const spawnSide =
+                this.normalizeSpawnSide(
+                    enemy.spawnSide ??
+                        enemy.getSpawnSide?.()
+                );
+
             if (
                 enemy.ai?.isEntering?.()
             ) {
-                const maximumEntryX =
-                    visibleRight +
-                    70;
+                if (
+                    spawnSide === "LEFT"
+                ) {
+                    const minimumEntryX =
+                        visibleLeft -
+                        70;
 
-                sprite.x =
-                    Math.min(
-                        sprite.x,
-                        maximumEntryX
-                    );
+                    sprite.x =
+                        Math.max(
+                            sprite.x,
+                            minimumEntryX
+                        );
+                } else {
+                    const maximumEntryX =
+                        visibleRight +
+                        70;
+
+                    sprite.x =
+                        Math.min(
+                            sprite.x,
+                            maximumEntryX
+                        );
+                }
 
                 sprite.y =
                     currentGroundY -
@@ -1044,21 +1108,29 @@ export default class EnemyManager {
                     );
                 }
             } else {
-                const visibleLeft =
-                    camera?.scrollX ??
-                    0;
+                /*
+                 * No forzamos a todos los enemigos a quedar
+                 * dentro de la pantalla. Pueden perseguir al
+                 * jugador desde ambos lados.
+                 */
+                const minimumX =
+                    visibleLeft -
+                    this.activeAreaMargin;
+
+                const maximumX =
+                    visibleRight +
+                    this.activeAreaMargin;
 
                 sprite.x =
                     Math.max(
-                        visibleLeft +
-                            50,
-                        sprite.x
+                        minimumX,
+                        Math.min(
+                            sprite.x,
+                            maximumX
+                        )
                     );
             }
 
-            /*
-             * Solo se ejecuta durante un resize puntual.
-             */
             sprite.body
                 ?.updateFromGameObject?.();
         }
@@ -1239,6 +1311,18 @@ export default class EnemyManager {
     // Consultas
     // =========================================================
 
+    getVisibleLeft() {
+        const camera =
+            this.scene
+                ?.cameras
+                ?.main;
+
+        return (
+            camera?.scrollX ??
+            0
+        );
+    }
+
     getVisibleRight() {
         const camera =
             this.scene
@@ -1384,9 +1468,6 @@ export default class EnemyManager {
             }
         }
 
-        /*
-         * Se conserva la referencia utilizada por CombatSystem.
-         */
         this.enemies.length =
             0;
     }
@@ -1411,10 +1492,6 @@ export default class EnemyManager {
         this.isDestroyed =
             true;
 
-        /*
-         * Al cerrar la escena se destruyen definitivamente tanto
-         * enemigos activos como integrantes del pool.
-         */
         this.destroyGroundColliders();
 
         for (

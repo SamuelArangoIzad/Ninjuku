@@ -8,15 +8,13 @@ export default class SoldierAI {
 
         this.decisionInterval =
             this.normalizeDecisionInterval(
-                configuration
-                    .decisionInterval,
+                configuration.decisionInterval,
                 120
             );
 
         this.activeAreaMargin =
             this.normalizeNonNegativeNumber(
-                configuration
-                    .activeAreaMargin,
+                configuration.activeAreaMargin,
                 350
             );
 
@@ -24,18 +22,24 @@ export default class SoldierAI {
             Math.max(
                 10,
                 this.normalizeNonNegativeNumber(
-                    configuration
-                        .entryPadding,
+                    configuration.entryPadding,
                     55
                 )
             );
 
+        this.spawnSide =
+            this.normalizeSpawnSide(
+                configuration.spawnSide ??
+                configuration.side ??
+                this.enemy?.getSpawnSide?.()
+            );
+
         /*
          * ENTERING:
-         * entra desde el borde derecho.
+         * El enemigo entra desde el lado donde apareció.
          *
          * COMBAT:
-         * persigue y ataca al jugador.
+         * Persigue y ataca al jugador.
          */
         this.mode =
             "ENTERING";
@@ -88,6 +92,35 @@ export default class SoldierAI {
         );
     }
 
+    normalizeSpawnSide(side) {
+        if (
+            side === "LEFT" ||
+            side === "left"
+        ) {
+            return "LEFT";
+        }
+
+        return "RIGHT";
+    }
+
+    getSpawnSide() {
+        const enemySide =
+            this.enemy
+                ?.getSpawnSide?.();
+
+        if (
+            enemySide !== undefined &&
+            enemySide !== null
+        ) {
+            this.spawnSide =
+                this.normalizeSpawnSide(
+                    enemySide
+                );
+        }
+
+        return this.spawnSide;
+    }
+
     // =========================================================
     // Update
     // =========================================================
@@ -138,7 +171,11 @@ export default class SoldierAI {
     }
 
     resolveTime(time) {
-        if (Number.isFinite(time)) {
+        if (
+            Number.isFinite(
+                time
+            )
+        ) {
             return time;
         }
 
@@ -173,7 +210,7 @@ export default class SoldierAI {
     }
 
     // =========================================================
-    // Entrada
+    // Entrada desde izquierda o derecha
     // =========================================================
 
     updateEntering(time) {
@@ -199,10 +236,12 @@ export default class SoldierAI {
             return;
         }
 
-        /*
-         * WaveManager, EnemyManager y SoldierAI deben utilizar
-         * la misma referencia del borde derecho visible.
-         */
+        const spawnSide =
+            this.getSpawnSide();
+
+        const visibleLeft =
+            camera.scrollX;
+
         const visibleRight =
             camera.scrollX +
             camera.width;
@@ -213,30 +252,70 @@ export default class SoldierAI {
                 Math.max(
                     24,
                     camera.width *
-                        0.06
+                    0.06
                 )
             );
 
-        const entryTargetX =
-            visibleRight -
-            responsivePadding;
-
+        /*
+         * Si apareció desde la izquierda,
+         * entra hacia la derecha.
+         *
+         * Si apareció desde la derecha,
+         * entra hacia la izquierda.
+         */
         if (
-            sprite.x >
-            entryTargetX
+            spawnSide ===
+            "LEFT"
         ) {
-            this.enemy
-                .setFacingDirection?.(
-                    -1
-                );
+            const entryTargetX =
+                visibleLeft +
+                responsivePadding;
 
-            this.enemy
-                .setWalking?.(
-                    -1
-                );
+            if (
+                sprite.x <
+                entryTargetX
+            ) {
+                this.enemy
+                    ?.setFacingDirection?.(
+                        1
+                    );
 
-            return;
+                this.enemy
+                    ?.setWalking?.(
+                        1
+                    );
+
+                return;
+            }
+        } else {
+            const entryTargetX =
+                visibleRight -
+                responsivePadding;
+
+            if (
+                sprite.x >
+                entryTargetX
+            ) {
+                this.enemy
+                    ?.setFacingDirection?.(
+                        -1
+                    );
+
+                this.enemy
+                    ?.setWalking?.(
+                        -1
+                    );
+
+                return;
+            }
         }
+
+        /*
+         * Ya entró completamente
+         * en la zona visible.
+         */
+        this.enemy
+            ?.setIdle?.();
 
         this.mode =
             "COMBAT";
@@ -293,21 +372,24 @@ export default class SoldierAI {
                 differenceX
             );
 
-        if (direction !== 0) {
+        if (
+            direction !== 0
+        ) {
             this.enemy
-                .setFacingDirection?.(
+                ?.setFacingDirection?.(
                     direction
                 );
         }
 
         /*
-         * El enemigo continúa acercándose aunque se encuentre
-         * inicialmente fuera del rango nominal de detección.
+         * Fuera del rango de detección:
+         * actualmente el enemigo sigue caminando
+         * hacia el jugador.
          */
         if (
             distance >
             this.enemy
-                .getDetectionRange()
+                ?.getDetectionRange?.()
         ) {
             this.walkTowardsTarget(
                 direction
@@ -316,22 +398,29 @@ export default class SoldierAI {
             return;
         }
 
+        /*
+         * Dentro del rango de ataque.
+         */
         if (
             distance <=
             this.enemy
-                .getAttackRange()
+                ?.getAttackRange?.()
         ) {
             this.enemy
-                .setIdle?.();
+                ?.setIdle?.();
 
             this.enemy
-                .tryAttack?.(
+                ?.tryAttack?.(
                     time
                 );
 
             return;
         }
 
+        /*
+         * Detectó al jugador, pero todavía
+         * no está suficientemente cerca.
+         */
         this.walkTowardsTarget(
             direction
         );
@@ -359,7 +448,9 @@ export default class SoldierAI {
     // =========================================================
 
     reset(configuration = {}) {
-        if (this.isDestroyed) {
+        if (
+            this.isDestroyed
+        ) {
             return false;
         }
 
@@ -405,9 +496,18 @@ export default class SoldierAI {
                 );
         }
 
+        this.spawnSide =
+            this.normalizeSpawnSide(
+                configuration.spawnSide ??
+                configuration.side ??
+                this.enemy
+                    ?.getSpawnSide?.() ??
+                this.spawnSide
+            );
+
         this.mode =
             configuration.mode ===
-                "COMBAT"
+            "COMBAT"
                 ? "COMBAT"
                 : "ENTERING";
 
@@ -425,7 +525,9 @@ export default class SoldierAI {
     // =========================================================
 
     setEnabled(enabled) {
-        if (this.isDestroyed) {
+        if (
+            this.isDestroyed
+        ) {
             return false;
         }
 
@@ -443,9 +545,7 @@ export default class SoldierAI {
             nextEnabled;
 
         if (
-            !this.enabled &&
-            this.mode !==
-                "ENTERING"
+            !this.enabled
         ) {
             this.enemy
                 ?.setIdle?.();
@@ -458,16 +558,16 @@ export default class SoldierAI {
         if (
             this.isDestroyed ||
             (
-                mode !==
-                    "ENTERING" &&
-                mode !==
-                    "COMBAT"
+                mode !== "ENTERING" &&
+                mode !== "COMBAT"
             )
         ) {
             return false;
         }
 
-        if (this.mode === mode) {
+        if (
+            this.mode === mode
+        ) {
             return false;
         }
 
@@ -492,7 +592,9 @@ export default class SoldierAI {
     }
 
     resetDecisionTimer() {
-        if (this.isDestroyed) {
+        if (
+            this.isDestroyed
+        ) {
             return;
         }
 
@@ -501,14 +603,20 @@ export default class SoldierAI {
     }
 
     setDecisionInterval(interval) {
-        if (this.isDestroyed) {
+        if (
+            this.isDestroyed
+        ) {
             return false;
         }
 
         const value =
             Number(interval);
 
-        if (!Number.isFinite(value)) {
+        if (
+            !Number.isFinite(
+                value
+            )
+        ) {
             return false;
         }
 
@@ -521,12 +629,29 @@ export default class SoldierAI {
         return true;
     }
 
+    setSpawnSide(side) {
+        if (
+            this.isDestroyed
+        ) {
+            return false;
+        }
+
+        this.spawnSide =
+            this.normalizeSpawnSide(
+                side
+            );
+
+        return true;
+    }
+
     // =========================================================
     // Destrucción
     // =========================================================
 
     destroy() {
-        if (this.isDestroyed) {
+        if (
+            this.isDestroyed
+        ) {
             return;
         }
 

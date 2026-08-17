@@ -1,18 +1,17 @@
 import EnemyAnimationController
-    from "./EnemyAnimationController.js";
+from "./EnemyAnimationController.js";
 
 import EnemyMovement
-    from "./EnemyMovement.js";
+from "./EnemyMovement.js";
 
 import EnemyCombat
-    from "./EnemyCombat.js";
+from "./EnemyCombat.js";
 
 import HealthComponent
-    from "../components/HealthComponent.js";
+from "../components/HealthComponent.js";
 
 import SoldierAI
-    from "../ai/SoldierAI.js";
-
+from "../ai/SoldierAI.js";
 
 export default class Enemy {
     constructor(
@@ -70,6 +69,18 @@ export default class Enemy {
         this.activeAreaMargin = 350;
         this.entryPadding = 50;
 
+        /*
+         * Lado desde el cual apareció el enemigo.
+         *
+         * EnemyManager utiliza esta propiedad durante
+         * el estado ENTERING para decidir:
+         *
+         * LEFT  -> entra desde la izquierda.
+         * RIGHT -> entra desde la derecha.
+         */
+        this.spawnSide =
+            "RIGHT";
+
         this.resetConfiguration(
             configuration
         );
@@ -81,8 +92,15 @@ export default class Enemy {
         this.state =
             "IDLE";
 
+        /*
+         * Si aparece por la izquierda,
+         * inicialmente debe mirar hacia la derecha.
+         *
+         * Si aparece por la derecha,
+         * inicialmente debe mirar hacia la izquierda.
+         */
         this.facingDirection =
-            -1;
+            this.getEntryDirection();
 
         this.isAttacking =
             false;
@@ -207,11 +225,15 @@ export default class Enemy {
 
         this.movement.reset({
             facingDirection:
-                -1,
+                this.facingDirection,
 
             state:
                 "IDLE"
         });
+
+        this.setFacingDirection(
+            this.facingDirection
+        );
     }
 
     // =========================================================
@@ -251,6 +273,34 @@ export default class Enemy {
                 fallback,
                 minimum
             )
+        );
+    }
+
+    normalizeSpawnSide(
+        side
+    ) {
+        if (
+            side === "LEFT" ||
+            side === "left"
+        ) {
+            return "LEFT";
+        }
+
+        if (
+            side === "RIGHT" ||
+            side === "right"
+        ) {
+            return "RIGHT";
+        }
+
+        return "RIGHT";
+    }
+
+    getEntryDirection() {
+        return (
+            this.spawnSide === "LEFT"
+                ? 1
+                : -1
         );
     }
 
@@ -363,6 +413,17 @@ export default class Enemy {
                 10
             );
 
+        /*
+         * Se conserva el lado actual si la configuración
+         * no especifica uno nuevo.
+         */
+        this.spawnSide =
+            this.normalizeSpawnSide(
+                configuration.spawnSide ??
+                configuration.side ??
+                this.spawnSide
+            );
+
         return true;
     }
 
@@ -401,8 +462,12 @@ export default class Enemy {
         this.state =
             "IDLE";
 
+        /*
+         * Se recalcula según el lado desde el que
+         * aparecerá esta nueva instancia reutilizada.
+         */
         this.facingDirection =
-            -1;
+            this.getEntryDirection();
 
         this.isAttacking =
             false;
@@ -497,9 +562,6 @@ export default class Enemy {
             .setAlpha(
                 1
             )
-            .setFlipX(
-                true
-            )
             .setActive(
                 true
             )
@@ -519,6 +581,7 @@ export default class Enemy {
         );
 
         this.configurePhysicsBody();
+
         this.configureActivePhysics();
 
         // =====================================================
@@ -532,7 +595,7 @@ export default class Enemy {
 
         this.movement?.reset({
             facingDirection:
-                -1,
+                this.facingDirection,
 
             state:
                 "IDLE"
@@ -553,6 +616,11 @@ export default class Enemy {
         });
 
         this.animations?.reset();
+
+        this.setFacingDirection(
+            this.facingDirection
+        );
+
         this.animations?.playIdle();
 
         return true;
@@ -940,10 +1008,15 @@ export default class Enemy {
             return false;
         }
 
+        this.facingDirection =
+            direction === 1
+                ? 1
+                : -1;
+
         return (
             this.movement
                 ?.setFacingDirection(
-                    direction
+                    this.facingDirection
                 ) ??
             false
         );
@@ -1168,6 +1241,14 @@ export default class Enemy {
 
     getScoreValue() {
         return this.scoreValue;
+    }
+
+    getSpawnSide() {
+        return this.spawnSide;
+    }
+
+    getFacingDirection() {
+        return this.facingDirection;
     }
 
     // =========================================================
