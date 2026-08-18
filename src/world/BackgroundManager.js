@@ -33,6 +33,32 @@
  * error frente a la curva real es de 4 niveles sobre 255, invisible.
  */
 const FADE_SEGMENTS = 16;
+
+/*
+ * Separación de profundidad entre paneles consecutivos.
+ *
+ * Un panel debe dibujarse por encima del anterior, porque su franja
+ * degradada es la que lo funde. Antes eso se resolvía con
+ * children.bringToTop(), pero ese método solo mueve el objeto al final
+ * de la lista de dibujado y NO encola una reordenación por
+ * profundidad: la lista se quedaba con los fondos al final y se
+ * dibujaban por encima del jugador y los enemigos, que desaparecían al
+ * cambiar de fondo.
+ *
+ * Ahora el orden lo da la profundidad, que Phaser sí respeta siempre.
+ * El incremento es minúsculo para que toda la cinta siga muy por
+ * debajo del suelo (5), los enemigos (9) y el jugador (10).
+ */
+const PANEL_DEPTH_STEP = 0.001;
+
+/*
+ * Los tramos de la franja van justo por encima del cuerpo de su propio
+ * panel, para que el píxel de solape entre ambos quede cubierto por el
+ * tramo, que en ese punto ya es opaco.
+ */
+const SEGMENT_DEPTH_OFFSET = PANEL_DEPTH_STEP / 2;
+
+
 export default class BackgroundManager {
     constructor(
         scene,
@@ -329,6 +355,8 @@ export default class BackgroundManager {
                 )
             );
         }
+
+        this.applyPanelDepths();
 
         this.applyOffset();
     }
@@ -629,20 +657,42 @@ export default class BackgroundManager {
         this.applyPanelTexture(panel);
 
         /*
-         * El panel que entra debe dibujarse por encima del anterior,
-         * porque su franja degradada es la que lo tapa. Todos
-         * comparten depth, así que el orden lo decide la posición en
-         * la lista de visualización.
+         * Al cambiar el orden de la cinta hay que reasignar las
+         * profundidades: el panel reciclado pasa a ser el último y
+         * debe quedar por encima de los demás.
          */
-        this.scene.children
-            .bringToTop(panel.body);
+        this.applyPanelDepths();
+    }
 
+    applyPanelDepths() {
         for (
-            const segment
-            of panel.segments
+            let index = 0;
+            index < this.panels.length;
+            index += 1
         ) {
-            this.scene.children
-                .bringToTop(segment);
+            const panel =
+                this.panels[index];
+
+            const panelDepth =
+                this.depth +
+                (
+                    index *
+                    PANEL_DEPTH_STEP
+                );
+
+            panel.body.setDepth(
+                panelDepth
+            );
+
+            for (
+                const segment
+                of panel.segments
+            ) {
+                segment.setDepth(
+                    panelDepth +
+                    SEGMENT_DEPTH_OFFSET
+                );
+            }
         }
     }
 
