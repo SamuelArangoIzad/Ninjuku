@@ -24,6 +24,9 @@ import WaveManager
 import Ground
     from "../world/Ground.js";
 
+import ObstacleManager
+    from "../world/ObstacleManager.js";
+
 import CombatSystem
     from "../systems/CombatSystem.js";
 
@@ -53,6 +56,21 @@ const BACKGROUND_KEYS = [
 ];
 
 
+/*
+ * Orden en el que se van encadenando las estructuras que hacen de
+ * obstaculo. Igual que los fondos, la secuencia se repite en bucle.
+ * Se alternan bajas y altas para que el ritmo de saltos varie.
+ */
+const OBSTACLE_KEYS = [
+    "obstacle-3",
+    "obstacle-1",
+    "obstacle-5",
+    "obstacle-2",
+    "obstacle-4",
+    "obstacle-6"
+];
+
+
 export default class GameScene extends Phaser.Scene {
     constructor() {
         super({
@@ -64,6 +82,9 @@ export default class GameScene extends Phaser.Scene {
         // =====================================================
 
         this.backgroundManager =
+            null;
+
+        this.obstacleManager =
             null;
 
         // =====================================================
@@ -159,6 +180,7 @@ export default class GameScene extends Phaser.Scene {
 
     preload() {
         this.loadBackgroundAssets();
+        this.loadObstacleAssets();
         this.loadPlayerAssets();
         this.loadEnemyAssets();
     }
@@ -210,6 +232,43 @@ export default class GameScene extends Phaser.Scene {
         this.load.image(
             "background-8",
             "/assets/backgrounds/fondo8.png"
+        );
+    }
+
+    // =========================================================
+    // Recursos de los obstaculos
+    // =========================================================
+
+    loadObstacleAssets() {
+        const folder =
+            "/assets/platformsGameplay/" +
+            "PlatformSprites/" +
+            "row-5-EstructuresToUse";
+
+        for (
+            let index = 1;
+            index <= 6;
+            index += 1
+        ) {
+            this.load.image(
+                `obstacle-${index}`,
+                `${folder}/estructure${index}.png`
+            );
+        }
+
+        /*
+         * Plataformas de salto. Sirven de escalon para llegar al
+         * tejado de las casas, que son demasiado altas para saltarlas
+         * de una sola vez.
+         */
+        this.load.image(
+            "platform-low",
+            `${folder}/platformJump.png`
+        );
+
+        this.load.image(
+            "platform-high",
+            `${folder}/platformJump2.png`
         );
     }
 
@@ -502,6 +561,52 @@ export default class GameScene extends Phaser.Scene {
             );
 
         // =====================================================
+        // Obstaculos
+        // =====================================================
+
+        this.obstacleManager =
+            new ObstacleManager(
+                this,
+                {
+                    ground:
+                        this.ground,
+
+                    sequence:
+                        OBSTACLE_KEYS,
+
+                    /*
+                     * Misma velocidad que el fondo: las estructuras
+                     * deben parecer parte del paisaje.
+                     */
+                    speed:
+                        35,
+
+                    horizontalExtension:
+                        this.worldHorizontalExtension,
+
+                    getPlayerSprite:
+                        () =>
+                            this.player
+                                ?.getSprite?.() ??
+                            null,
+
+                    getEnemySprites:
+                        () =>
+                            this.enemyManager
+                                ?.getEnemies?.()
+                                ?.map(
+                                    (enemy) =>
+                                        enemy
+                                            ?.getSprite?.()
+                                )
+                                ?.filter(Boolean) ??
+                            []
+                }
+            );
+
+        this.obstacleManager.create();
+
+        // =====================================================
         // Sistemas
         // =====================================================
 
@@ -792,6 +897,16 @@ export default class GameScene extends Phaser.Scene {
         }
 
         /*
+         * Va despues del jugador y los enemigos: el arrastre de quien
+         * viaja encima de una estructura se aplica sobre las
+         * posiciones ya resueltas de este fotograma.
+         */
+        this.obstacleManager
+            ?.update(
+                delta
+            );
+
+        /*
          * Las posiciones de las barras se actualizan aunque
          * las entidades estén detenidas temporalmente.
          */
@@ -1025,6 +1140,9 @@ export default class GameScene extends Phaser.Scene {
         const currentGroundY =
             this.getGroundSurfaceY();
 
+        this.obstacleManager
+            ?.resize?.();
+
         this.repositionActorsAfterResize(
             previousGroundY,
             currentGroundY,
@@ -1120,6 +1238,9 @@ export default class GameScene extends Phaser.Scene {
 
         this.enemyManager
             ?.rebuildGroundColliders?.();
+
+        this.obstacleManager
+            ?.resize?.();
     }
 
     // =========================================================
@@ -1328,6 +1449,12 @@ export default class GameScene extends Phaser.Scene {
             ?.destroy();
 
         this.ground =
+            null;
+
+        this.obstacleManager
+            ?.destroy();
+
+        this.obstacleManager =
             null;
 
         this.backgroundManager

@@ -34,6 +34,58 @@ const GameSettings = {
     },
 
     // =========================================================
+    // Obstaculos
+    // =========================================================
+
+    obstacles: {
+        /*
+         * Secuencia de estructuras. Se repite en bucle.
+         */
+        sequence: [
+            "obstacle-3",
+            "obstacle-1",
+            "obstacle-5",
+            "obstacle-2",
+            "obstacle-4",
+            "obstacle-6"
+        ],
+
+        /*
+         * Misma velocidad que el fondo, para que parezcan parte del
+         * paisaje y no elementos flotando sobre el.
+         */
+        speed: 35,
+
+        /*
+         * Escala de las casas. Fija, no responsiva: la altura del
+         * salto tampoco depende de la pantalla. A 0.95 miden entre
+         * 142 y 225 px, tamano de casa de verdad.
+         *
+         * A esa altura ya no se saltan de una vez, por eso delante de
+         * cada casa aparece una plataforma que hace de escalon.
+         */
+        scale: 0.95,
+
+        /*
+         * Altura que alcanza un salto. Sale de la fisica del juego:
+         * 600^2 / (2 * 1200) = 150 px. De aqui depende que plataforma
+         * se elige para cada casa.
+         */
+        jumpHeight: 150,
+
+        /*
+         * Separacion entre parejas (plataforma + casa) consecutivas.
+         */
+        spacing: 760,
+
+        /*
+         * Por delante del fondo (-100) y por detras de los enemigos
+         * (9) y del jugador (10).
+         */
+        depth: 4
+    },
+
+    // =========================================================
     // Jugador
     // =========================================================
 

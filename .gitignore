@@ -6,3 +6,6 @@ dist/
 
 # Herramientas locales del editor
 .claude/
+
+# Archivos comprimidos de assets: se sube el contenido, no el zip
+*.zip
