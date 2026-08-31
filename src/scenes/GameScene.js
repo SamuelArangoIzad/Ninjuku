@@ -386,61 +386,369 @@ export default class GameScene extends Phaser.Scene {
     // Recursos del enemigo
     // =========================================================
 
+        // =========================================================
+    // Recursos de enemigos
+    // =========================================================
+
     loadEnemyAssets() {
-        this.loadEnemySequence(
-            "soldier-idle",
-            "soldier_idle",
-            6
-        );
+        // =====================================================
+        // Soldier
+        // =====================================================
 
-        this.loadEnemySequence(
-            "soldier-walk",
-            "soldier_walk",
-            8
-        );
+        this.loadEnemySequence({
+            texturePrefix:
+                "soldier-idle",
 
-        this.loadEnemySequence(
-            "soldier-attack",
-            "soldier_attack",
-            7
-        );
+            basePath:
+                "/assets/enemies/soldier/frames/soldier_idle",
 
-        this.loadEnemySequence(
-            "soldier-hurt",
-            "soldier_hurt",
-            4
-        );
+            filePrefix:
+                "frame_",
 
-        this.loadEnemySequence(
-            "soldier-death",
-            "soldier_death",
-            6
-        );
+            fileExtension:
+                ".png",
+
+            startIndex:
+                0,
+
+            frameCount:
+                6,
+
+            padLength:
+                2
+        });
+
+        this.loadEnemySequence({
+            texturePrefix:
+                "soldier-walk",
+
+            basePath:
+                "/assets/enemies/soldier/frames/soldier_walk",
+
+            filePrefix:
+                "frame_",
+
+            fileExtension:
+                ".png",
+
+            startIndex:
+                0,
+
+            frameCount:
+                8,
+
+            padLength:
+                2
+        });
+
+        this.loadEnemySequence({
+            texturePrefix:
+                "soldier-attack",
+
+            basePath:
+                "/assets/enemies/soldier/frames/soldier_attack",
+
+            filePrefix:
+                "frame_",
+
+            fileExtension:
+                ".png",
+
+            startIndex:
+                0,
+
+            frameCount:
+                7,
+
+            padLength:
+                2
+        });
+
+        this.loadEnemySequence({
+            texturePrefix:
+                "soldier-hurt",
+
+            basePath:
+                "/assets/enemies/soldier/frames/soldier_hurt",
+
+            filePrefix:
+                "frame_",
+
+            fileExtension:
+                ".png",
+
+            startIndex:
+                0,
+
+            frameCount:
+                4,
+
+            padLength:
+                2
+        });
+
+        this.loadEnemySequence({
+            texturePrefix:
+                "soldier-death",
+
+            basePath:
+                "/assets/enemies/soldier/frames/soldier_death",
+
+            filePrefix:
+                "frame_",
+
+            fileExtension:
+                ".png",
+
+            startIndex:
+                0,
+
+            frameCount:
+                6,
+
+            padLength:
+                2
+        });
+
+        // =====================================================
+        // Samurai
+        // =====================================================
+
+        /*
+         * Samurai empieza en 1:
+         *
+         * samuIdle1.png
+         * samuIdle2.png
+         * ...
+         *
+         * Internamente registramos las texturas como:
+         *
+         * samurai-idle-01
+         * samurai-idle-02
+         * ...
+         */
+
+        this.loadEnemySequence({
+            texturePrefix:
+                "samurai-idle",
+
+            basePath:
+                "/assets/enemies/samurai/frames/samurai_idle",
+
+            filePrefix:
+                "samuIdle",
+
+            fileExtension:
+                ".png",
+
+            startIndex:
+                1,
+
+            frameCount:
+                7,
+
+            padLength:
+                2,
+
+            padFileNumber:
+                false
+        });
+
+        this.loadEnemySequence({
+            texturePrefix:
+                "samurai-walk",
+
+            basePath:
+                "/assets/enemies/samurai/frames/samurai_walk",
+
+            filePrefix:
+                "samuWalk",
+
+            fileExtension:
+                ".png",
+
+            startIndex:
+                1,
+
+            frameCount:
+                8,
+
+            padLength:
+                2,
+
+            padFileNumber:
+                false
+        });
+
+        this.loadEnemySequence({
+            texturePrefix:
+                "samurai-attack",
+
+            basePath:
+                "/assets/enemies/samurai/frames/samurai_attack",
+
+            filePrefix:
+                "samuAttack",
+
+            fileExtension:
+                ".png",
+
+            startIndex:
+                1,
+
+            frameCount:
+                7,
+
+            padLength:
+                2,
+
+            padFileNumber:
+                false
+        });
+
+        this.loadEnemySequence({
+            texturePrefix:
+                "samurai-hurt",
+
+            basePath:
+                "/assets/enemies/samurai/frames/samurai_hurt",
+
+            filePrefix:
+                "samuHurt",
+
+            fileExtension:
+                ".png",
+
+            startIndex:
+                1,
+
+            frameCount:
+                5,
+
+            padLength:
+                2,
+
+            padFileNumber:
+                false
+        });
+
+        this.loadEnemySequence({
+            texturePrefix:
+                "samurai-death",
+
+            basePath:
+                "/assets/enemies/samurai/frames/samurai_death",
+
+            filePrefix:
+                "samuDeath",
+
+            fileExtension:
+                ".png",
+
+            startIndex:
+                1,
+
+            frameCount:
+                7,
+
+            padLength:
+                2,
+
+            padFileNumber:
+                false
+        });
     }
 
-    loadEnemySequence(
+    loadEnemySequence({
         texturePrefix,
-        directoryName,
-        frameCount
-    ) {
-        for (
-            let index = 0;
-            index < frameCount;
-            index += 1
+        basePath,
+        filePrefix,
+        fileExtension = ".png",
+        startIndex = 0,
+        frameCount = 1,
+        padLength = 2,
+        padFileNumber = true
+    } = {}) {
+        if (
+            !texturePrefix ||
+            !basePath ||
+            !filePrefix ||
+            frameCount <= 0
         ) {
-            const number =
-                String(index).padStart(
-                    2,
-                    "0"
-                );
+            console.error(
+                "[GameScene] Configuración inválida " +
+                "para cargar secuencia enemiga.",
+                {
+                    texturePrefix,
+                    basePath,
+                    filePrefix,
+                    frameCount
+                }
+            );
+
+            return false;
+        }
+
+        for (
+            let offset = 0;
+            offset < frameCount;
+            offset += 1
+        ) {
+            const index =
+                startIndex +
+                offset;
+
+            /*
+             * Key interna Phaser.
+             *
+             * Soldier:
+             * soldier-idle-00
+             *
+             * Samurai:
+             * samurai-idle-01
+             */
+            const textureNumber =
+                String(index)
+                    .padStart(
+                        padLength,
+                        "0"
+                    );
+
+            /*
+             * Nombre físico del archivo.
+             *
+             * Soldier:
+             * frame_00.png
+             *
+             * Samurai:
+             * samuIdle1.png
+             */
+            const fileNumber =
+                padFileNumber
+                    ? String(index)
+                        .padStart(
+                            padLength,
+                            "0"
+                        )
+                    : String(index);
+
+            const textureKey =
+                `${texturePrefix}-${textureNumber}`;
+
+            const filePath =
+                `${basePath}/` +
+                `${filePrefix}` +
+                `${fileNumber}` +
+                `${fileExtension}`;
 
             this.load.image(
-                `${texturePrefix}-${number}`,
-                `/assets/enemies/soldier/frames/${directoryName}/frame_${number}.png`
+                textureKey,
+                filePath
             );
         }
-    }
 
+        return true;
+    }
     // =========================================================
     // Create
     // =========================================================

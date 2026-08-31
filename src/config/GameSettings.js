@@ -22,24 +22,28 @@ const GameSettings = {
             "background-7",
             "background-8"
         ],
+
         speed: 35,
         depth: -100,
 
         /*
          * Fracción del fondo que dura la disolución hacia el
-         * siguiente. Subirlo suaviza más la entrada y la salida de
-         * la mezcla. El máximo admitido es 0.49.
+         * siguiente. Subirlo suaviza más la entrada y la salida
+         * de la mezcla.
+         *
+         * El máximo admitido es 0.49.
          */
         blendRatio: 0.48
     },
 
     // =========================================================
-    // Obstaculos
+    // Obstáculos
     // =========================================================
 
     obstacles: {
         /*
-         * Secuencia de estructuras. Se repite en bucle.
+         * Secuencia de estructuras.
+         * Se repite en bucle.
          */
         sequence: [
             "obstacle-3",
@@ -51,36 +55,38 @@ const GameSettings = {
         ],
 
         /*
-         * Misma velocidad que el fondo, para que parezcan parte del
-         * paisaje y no elementos flotando sobre el.
+         * Misma velocidad que el fondo para que parezcan parte
+         * del paisaje y no elementos flotando sobre él.
          */
         speed: 35,
 
         /*
-         * Escala de las casas. Fija, no responsiva: la altura del
-         * salto tampoco depende de la pantalla. A 0.95 miden entre
-         * 142 y 225 px, tamano de casa de verdad.
+         * Escala de las casas.
          *
-         * A esa altura ya no se saltan de una vez, por eso delante de
-         * cada casa aparece una plataforma que hace de escalon.
+         * Es fija, no responsiva: la altura del salto tampoco
+         * depende de la pantalla.
          */
         scale: 0.95,
 
         /*
-         * Altura que alcanza un salto. Sale de la fisica del juego:
-         * 600^2 / (2 * 1200) = 150 px. De aqui depende que plataforma
-         * se elige para cada casa.
+         * Altura que alcanza un salto.
+         *
+         * 600^2 / (2 * 1200) = 150 px.
          */
         jumpHeight: 150,
 
         /*
-         * Separacion entre parejas (plataforma + casa) consecutivas.
+         * Separación entre parejas:
+         *
+         * plataforma + casa
          */
         spacing: 760,
 
         /*
-         * Por delante del fondo (-100) y por detras de los enemigos
-         * (9) y del jugador (10).
+         * Por delante del fondo (-100) y por detrás de:
+         *
+         * enemigos -> 9
+         * jugador  -> 10
          */
         depth: 4
     },
@@ -92,13 +98,20 @@ const GameSettings = {
     player: {
         walkSpeed: 250,
         runSpeed: 400,
+
         jumpForce: -600,
         maximumFallSpeed: 1000,
 
         maximumHealth: 5,
+
+        /*
+         * Tiempo durante el cual no puede volver a recibir daño
+         * después de ser golpeado.
+         */
         invulnerabilityDuration: 700,
 
         attackDamage: 1,
+
         attackRange: 105,
         attackHeight: 72,
 
@@ -115,36 +128,228 @@ const GameSettings = {
     // =========================================================
 
     soldier: {
+        /*
+         * Identificador lógico.
+         */
+        enemyType: "soldier",
+
+        // -----------------------------------------------------
+        // Estadísticas
+        // -----------------------------------------------------
+
         moveSpeed: 120,
 
-        attackDamage: 1,
         maximumHealth: 3,
+
+        attackDamage: 1,
+
         scoreValue: 100,
 
+        // -----------------------------------------------------
+        // IA
+        // -----------------------------------------------------
+
+        /*
+         * Distancia máxima desde la cual detecta al jugador.
+         */
         detectionRange: 1200,
+
+        /*
+         * Distancia a partir de la cual deja de caminar y
+         * comienza a atacar.
+         */
         attackRange: 115,
+
+        /*
+         * Milisegundos entre ataques.
+         */
         attackCooldown: 1300,
+
+        /*
+         * Frecuencia con la que SoldierAI vuelve a tomar
+         * decisiones.
+         */
+        decisionInterval: 120,
+
+        // -----------------------------------------------------
+        // Hitbox de ataque
+        // -----------------------------------------------------
 
         attackHitboxWidth: 125,
         attackHitboxHeight: 58,
         attackHitboxOffset: 15,
 
-        decisionInterval: 120,
+        // -----------------------------------------------------
+        // Gestión
+        // -----------------------------------------------------
 
         /*
          * Distancia alrededor de la pantalla dentro de la cual
-         * los enemigos permanecen activos.
+         * el enemigo permanece activo.
          */
         activeAreaMargin: 350,
 
         /*
-         * Cantidad de píxeles que el centro lógico del enemigo
-         * debe avanzar dentro de la pantalla antes de pasar
-         * al comportamiento normal.
+         * Píxeles que debe avanzar dentro de la pantalla antes
+         * de abandonar el estado ENTERING.
          */
         entryPadding: 55,
 
+        /*
+         * Escala aplicada durante la animación de muerte.
+         */
         deathScaleMultiplier: 0.82
+    },
+
+    // =========================================================
+    // Samurai
+    // =========================================================
+
+    samurai: {
+        /*
+         * Identificador lógico.
+         */
+        enemyType: "samurai",
+
+        // -----------------------------------------------------
+        // Estadísticas
+        // -----------------------------------------------------
+
+        /*
+         * El Samurai comienza siendo ligeramente más lento
+         * que el Soldier.
+         */
+        moveSpeed: 105,
+
+        /*
+         * Más resistente que el Soldier:
+         *
+         * Soldier = 3
+         * Samurai = 5
+         */
+        maximumHealth: 5,
+
+        /*
+         * El golpe de katana causa dos puntos de daño.
+         *
+         * El jugador tiene actualmente 5 puntos de vida.
+         */
+        attackDamage: 2,
+
+        /*
+         * Recompensa superior por derrotarlo.
+         */
+        scoreValue: 175,
+
+        // -----------------------------------------------------
+        // IA
+        // -----------------------------------------------------
+
+        /*
+         * Detecta al jugador prácticamente desde cualquier
+         * posición visible del escenario.
+         */
+        detectionRange: 1200,
+
+        /*
+         * Enemigo cuerpo a cuerpo.
+         *
+         * Tiene que acercarse bastante antes de atacar.
+         */
+        attackRange: 105,
+
+        /*
+         * Ataque más potente pero ligeramente más lento.
+         */
+        attackCooldown: 1500,
+
+        /*
+         * Reacciona un poco más rápido que SoldierAI.
+         */
+        decisionInterval: 100,
+
+        // -----------------------------------------------------
+        // Hitbox de katana
+        // -----------------------------------------------------
+
+        /*
+         * La espada permite una hitbox algo más ancha que la
+         * del Soldier.
+         */
+        attackHitboxWidth: 145,
+
+        attackHitboxHeight: 65,
+
+        attackHitboxOffset: 20,
+
+        // -----------------------------------------------------
+        // Gestión
+        // -----------------------------------------------------
+
+        activeAreaMargin: 350,
+
+        entryPadding: 55,
+
+        deathScaleMultiplier: 0.82,
+
+        // -----------------------------------------------------
+        // Animaciones
+        // -----------------------------------------------------
+
+        /*
+         * Cantidad real de frames disponibles dentro de:
+         *
+         * public/assets/enemies/samurai/frames/
+         */
+        animations: {
+            idle: {
+                frameCount: 7,
+                frameRate: 8,
+                repeat: -1
+            },
+
+            walk: {
+                frameCount: 8,
+                frameRate: 10,
+                repeat: -1
+            },
+
+            attack: {
+                frameCount: 7,
+                frameRate: 12,
+                repeat: 0
+            },
+
+            hurt: {
+                frameCount: 5,
+                frameRate: 12,
+                repeat: 0
+            },
+
+            death: {
+                frameCount: 7,
+                frameRate: 10,
+                repeat: 0
+            }
+        },
+
+        /*
+         * Frame aproximado del ataque en el cual la katana
+         * debería producir daño.
+         *
+         * Los frames reales son:
+         *
+         * samuAttack1
+         * samuAttack2
+         * samuAttack3
+         * samuAttack4
+         * samuAttack5
+         * samuAttack6
+         * samuAttack7
+         *
+         * Usaremos inicialmente el cuarto frame como impacto.
+         */
+        attackImpactFrame: 4
     },
 
     // =========================================================
@@ -153,10 +358,29 @@ const GameSettings = {
 
     enemies: {
         cullingEnabled: true,
+
         activeAreaMargin: 350,
 
+        /*
+         * Se mantiene pooling porque tanto Soldier como Samurai
+         * podrán reutilizar instancias.
+         *
+         * EnemyManager debe mantener separado el tipo lógico de
+         * cada objeto para evitar reutilizar un Samurai como
+         * Soldier o viceversa.
+         */
         poolingEnabled: true,
-        maximumPoolSize: 12
+
+        /*
+         * Límite conjunto de objetos almacenados en el pool.
+         */
+        maximumPoolSize: 12,
+
+        /*
+         * Posición adicional fuera del límite visible desde la
+         * que EnemyManager puede generar entidades.
+         */
+        spawnOffset: 35
     },
 
     // =========================================================
@@ -180,31 +404,94 @@ const GameSettings = {
     waves: {
         enabled: true,
 
+        // -----------------------------------------------------
+        // Tiempos
+        // -----------------------------------------------------
+
         initialDelay: 1200,
+
         delayBetweenWaves: 2200,
+
         spawnInterval: 850,
 
+        // -----------------------------------------------------
+        // Cantidad de enemigos
+        // -----------------------------------------------------
+
         initialEnemyCount: 2,
+
         enemyIncrement: 1,
+
         maximumEnemiesPerWave: 8,
 
         /*
-         * Cero representa oleadas infinitas.
+         * 0 = oleadas infinitas.
          */
         maximumWaves: 0,
 
+        // -----------------------------------------------------
+        // Spawn
+        // -----------------------------------------------------
+
         /*
-         * El centro del lienzo se crea ligeramente después
-         * del borde derecho.
+         * Los enemigos aparecen ligeramente por fuera de la
+         * pantalla.
          */
         spawnOutsideDistance: 35,
+
         spawnVariation: 25,
 
+        // -----------------------------------------------------
+        // Escalado de vida
+        // -----------------------------------------------------
+
+        /*
+         * Cada tres oleadas aumenta la salud.
+         */
         healthIncreaseEveryWaves: 3,
+
         healthIncreaseAmount: 1,
 
+        // -----------------------------------------------------
+        // Escalado de velocidad
+        // -----------------------------------------------------
+
         speedIncreasePerWave: 2,
-        maximumSpeedBonus: 35
+
+        maximumSpeedBonus: 35,
+
+        // -----------------------------------------------------
+        // Samurai
+        // -----------------------------------------------------
+
+        /*
+         * Oleada 1:
+         *
+         * solamente Soldiers.
+         *
+         * Oleada 2 en adelante:
+         *
+         * puede comenzar a aparecer Samurai.
+         */
+        samuraiStartsAtWave: 2,
+
+        /*
+         * Probabilidad inicial de Samurai al desbloquearse.
+         *
+         * 0.25 = 25 %
+         */
+        samuraiBaseChance: 0.25,
+
+        /*
+         * Cada nueva oleada aumenta la probabilidad en 10 %.
+         */
+        samuraiChanceIncrease: 0.10,
+
+        /*
+         * Nunca habrá más de 65 % de probabilidad de Samurai
+         * para mantener Soldiers presentes.
+         */
+        maximumSamuraiChance: 0.65
     },
 
     // =========================================================
@@ -213,6 +500,7 @@ const GameSettings = {
 
     performance: {
         visible: true,
+
         updateInterval: 500
     }
 };

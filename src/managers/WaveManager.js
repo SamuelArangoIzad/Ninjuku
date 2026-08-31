@@ -9,17 +9,19 @@ export default class WaveManager {
         scene,
         configuration = {}
     ) {
-        this.scene = scene;
+        this.scene =
+            scene;
 
         this.enemyManager =
             configuration.enemyManager ??
             null;
 
         const settings =
-            GameSettings.waves ?? {};
+            GameSettings.waves ??
+            {};
 
         // =====================================================
-        // Configuración
+        // Configuración general
         // =====================================================
 
         this.enabled =
@@ -119,6 +121,10 @@ export default class WaveManager {
                 )
             );
 
+        // =====================================================
+        // Dificultad
+        // =====================================================
+
         this.healthIncreaseEveryWaves =
             Math.max(
                 1,
@@ -164,22 +170,94 @@ export default class WaveManager {
             );
 
         // =====================================================
+        // Configuración Samurai
+        // =====================================================
+
+        /*
+         * Primera oleada en la que puede aparecer.
+         */
+        this.samuraiStartsAtWave =
+            Math.max(
+                1,
+                Math.floor(
+                    this.getNumber(
+                        configuration.samuraiStartsAtWave ??
+                            settings.samuraiStartsAtWave,
+                        2
+                    )
+                )
+            );
+
+        /*
+         * Probabilidad inicial:
+         * 0.25 = 25 %
+         */
+        this.samuraiBaseChance =
+            Phaser.Math.Clamp(
+                this.getNumber(
+                    configuration.samuraiBaseChance ??
+                        settings.samuraiBaseChance,
+                    0.25
+                ),
+                0,
+                1
+            );
+
+        /*
+         * Aumento de probabilidad por oleada.
+         */
+        this.samuraiChanceIncrease =
+            Phaser.Math.Clamp(
+                this.getNumber(
+                    configuration.samuraiChanceIncrease ??
+                        settings.samuraiChanceIncrease,
+                    0.10
+                ),
+                0,
+                1
+            );
+
+        /*
+         * Nunca exceder este porcentaje.
+         */
+        this.maximumSamuraiChance =
+            Phaser.Math.Clamp(
+                this.getNumber(
+                    configuration.maximumSamuraiChance ??
+                        settings.maximumSamuraiChance,
+                    0.65
+                ),
+                0,
+                1
+            );
+
+        // =====================================================
         // Estado
         // =====================================================
 
-        this.currentWave = 0;
+        this.currentWave =
+            0;
 
         this.totalEnemiesInCurrentWave =
             0;
 
-        this.pendingSpawns = 0;
+        this.pendingSpawns =
+            0;
 
-        this.isRunning = false;
-        this.isSpawning = false;
-        this.waitingForNextWave = false;
+        this.isRunning =
+            false;
 
-        this.hasFinished = false;
-        this.isDestroyed = false;
+        this.isSpawning =
+            false;
+
+        this.waitingForNextWave =
+            false;
+
+        this.hasFinished =
+            false;
+
+        this.isDestroyed =
+            false;
 
         // =====================================================
         // Temporizadores
@@ -188,7 +266,8 @@ export default class WaveManager {
         this.spawnTimers =
             new Set();
 
-        this.nextWaveTimer = null;
+        this.nextWaveTimer =
+            null;
     }
 
     // =========================================================
@@ -202,7 +281,9 @@ export default class WaveManager {
         const parsed =
             Number(value);
 
-        return Number.isFinite(parsed)
+        return Number.isFinite(
+            parsed
+        )
             ? parsed
             : fallback;
     }
@@ -221,7 +302,7 @@ export default class WaveManager {
     }
 
     // =========================================================
-    // Inicio y detención
+    // Inicio / detención
     // =========================================================
 
     start() {
@@ -235,8 +316,11 @@ export default class WaveManager {
             return false;
         }
 
-        this.isRunning = true;
-        this.hasFinished = false;
+        this.isRunning =
+            true;
+
+        this.hasFinished =
+            false;
 
         this.scheduleNextWave(
             this.initialDelay
@@ -253,9 +337,14 @@ export default class WaveManager {
             return;
         }
 
-        this.isRunning = false;
-        this.isSpawning = false;
-        this.waitingForNextWave = false;
+        this.isRunning =
+            false;
+
+        this.isSpawning =
+            false;
+
+        this.waitingForNextWave =
+            false;
 
         this.clearTimers();
     }
@@ -267,14 +356,17 @@ export default class WaveManager {
 
         this.stop();
 
-        this.currentWave = 0;
+        this.currentWave =
+            0;
 
         this.totalEnemiesInCurrentWave =
             0;
 
-        this.pendingSpawns = 0;
+        this.pendingSpawns =
+            0;
 
-        this.hasFinished = false;
+        this.hasFinished =
+            false;
 
         return this.start();
     }
@@ -366,7 +458,8 @@ export default class WaveManager {
             return;
         }
 
-        this.currentWave += 1;
+        this.currentWave +=
+            1;
 
         this.totalEnemiesInCurrentWave =
             this.calculateEnemyCount(
@@ -376,7 +469,8 @@ export default class WaveManager {
         this.pendingSpawns =
             this.totalEnemiesInCurrentWave;
 
-        this.isSpawning = true;
+        this.isSpawning =
+            true;
 
         for (
             let index = 0;
@@ -391,11 +485,18 @@ export default class WaveManager {
 
         console.log(
             `[WaveManager] Oleada ${this.currentWave}: ` +
-            `${this.totalEnemiesInCurrentWave} enemigos.`
+            `${this.totalEnemiesInCurrentWave} enemigos. ` +
+            `Probabilidad Samurai: ` +
+            `${Math.round(
+                this.getSamuraiChance() *
+                100
+            )}%`
         );
     }
 
-    calculateEnemyCount(waveNumber) {
+    calculateEnemyCount(
+        waveNumber
+    ) {
         const calculated =
             this.initialEnemyCount +
             (
@@ -425,7 +526,8 @@ export default class WaveManager {
             index *
             this.spawnInterval;
 
-        let timer = null;
+        let timer =
+            null;
 
         timer =
             this.scene.time.delayedCall(
@@ -447,11 +549,13 @@ export default class WaveManager {
                     this.pendingSpawns =
                         Math.max(
                             0,
-                            this.pendingSpawns - 1
+                            this.pendingSpawns -
+                                1
                         );
 
                     if (
-                        this.pendingSpawns === 0
+                        this.pendingSpawns ===
+                        0
                     ) {
                         this.isSpawning =
                             false;
@@ -465,14 +569,63 @@ export default class WaveManager {
     }
 
     // =========================================================
-    // Aparición
+    // Selección del tipo
     // =========================================================
 
+    getSamuraiChance() {
+        if (
+            this.currentWave <
+            this.samuraiStartsAtWave
+        ) {
+            return 0;
+        }
+
+        const additionalWaves =
+            Math.max(
+                0,
+                this.currentWave -
+                    this.samuraiStartsAtWave
+            );
+
+        const chance =
+            this.samuraiBaseChance +
+            (
+                additionalWaves *
+                this.samuraiChanceIncrease
+            );
+
+        return Phaser.Math.Clamp(
+            chance,
+            0,
+            this.maximumSamuraiChance
+        );
+    }
+
+    getRandomEnemyType() {
+        const chance =
+            this.getSamuraiChance();
+
+        if (
+            chance > 0 &&
+            Math.random() <
+                chance
+        ) {
+            return "samurai";
+        }
+
+        return "soldier";
+    }
+
     getRandomSpawnSide() {
-        return Math.random() < 0.5
+        return Math.random() <
+            0.5
             ? "LEFT"
             : "RIGHT";
     }
+
+    // =========================================================
+    // Aparición
+    // =========================================================
 
     spawnEnemy() {
         if (
@@ -484,19 +637,14 @@ export default class WaveManager {
         }
 
         const camera =
-            this.scene.cameras?.main;
+            this.scene
+                .cameras
+                ?.main;
 
         if (!camera) {
             return null;
         }
 
-        /*
-         * Usamos los límites reales de la cámara.
-         *
-         * Esto evita depender de scene.scale.width,
-         * que puede diferir temporalmente durante
-         * la carga o el resize en dispositivos móviles.
-         */
         const visibleLeft =
             camera.scrollX;
 
@@ -504,15 +652,6 @@ export default class WaveManager {
             camera.scrollX +
             camera.width;
 
-        /*
-         * Cada enemigo decide de qué lado aparecer.
-         *
-         * LEFT:
-         *   aparece fuera del borde izquierdo.
-         *
-         * RIGHT:
-         *   aparece fuera del borde derecho.
-         */
         const spawnSide =
             this.getRandomSpawnSide();
 
@@ -526,7 +665,9 @@ export default class WaveManager {
 
         let spawnX;
 
-        if (spawnSide === "LEFT") {
+        if (
+            spawnSide === "LEFT"
+        ) {
             spawnX =
                 visibleLeft -
                 this.spawnOutsideDistance -
@@ -543,25 +684,73 @@ export default class WaveManager {
                 .getGroundSurfaceY() -
             5;
 
-        const settings =
-            GameSettings.soldier ?? {};
+        const enemyType =
+            this.getRandomEnemyType();
 
         const enemy =
-            this.enemyManager.spawnSoldier(
+            enemyType === "samurai"
+                ? this.spawnSamurai(
+                    spawnX,
+                    spawnY,
+                    spawnSide
+                )
+                : this.spawnSoldier(
+                    spawnX,
+                    spawnY,
+                    spawnSide
+                );
+
+        console.log(
+            "[WaveManager] Enemigo generado:",
+            {
+                enemyType,
+                wave:
+                    this.currentWave,
+                spawnSide,
+                spawnX,
+                spawnY,
+                visibleLeft,
+                visibleRight,
+                cameraWidth:
+                    camera.width,
+                scaleWidth:
+                    this.scene
+                        .scale
+                        .width
+            }
+        );
+
+        return enemy;
+    }
+
+    spawnSoldier(
+        spawnX,
+        spawnY,
+        spawnSide
+    ) {
+        const settings =
+            GameSettings.soldier ??
+            {};
+
+        return this.enemyManager
+            .spawnSoldier(
                 spawnX,
                 spawnY,
                 {
-                    /*
-                     * Este dato será utilizado por
-                     * EnemyManager y SoldierAI.
-                     */
+                    enemyType:
+                        "soldier",
+
                     spawnSide,
 
                     maximumHealth:
-                        this.getEnemyHealthForCurrentWave(),
+                        this.getEnemyHealthForCurrentWave(
+                            "soldier"
+                        ),
 
                     moveSpeed:
-                        this.getEnemySpeedForCurrentWave(),
+                        this.getEnemySpeedForCurrentWave(
+                            "soldier"
+                        ),
 
                     attackDamage:
                         settings.attackDamage ??
@@ -612,41 +801,151 @@ export default class WaveManager {
                         0.82
                 }
             );
+    }
 
-        console.log(
-            "[WaveManager] Enemigo generado:",
-            {
-                spawnSide,
+    spawnSamurai(
+        spawnX,
+        spawnY,
+        spawnSide
+    ) {
+        const settings =
+            GameSettings.samurai ??
+            {};
+
+        return this.enemyManager
+            .spawnSamurai(
                 spawnX,
                 spawnY,
-                visibleLeft,
-                visibleRight,
-                cameraWidth:
-                    camera.width,
-                scaleWidth:
-                    this.scene.scale.width
-            }
-        );
+                {
+                    enemyType:
+                        "samurai",
 
-        return enemy;
+                    spawnSide,
+
+                    /*
+                     * Samurai inicialmente más resistente.
+                     */
+                    maximumHealth:
+                        this.getEnemyHealthForCurrentWave(
+                            "samurai"
+                        ),
+
+                    /*
+                     * Algo más lento que Soldier por defecto.
+                     */
+                    moveSpeed:
+                        this.getEnemySpeedForCurrentWave(
+                            "samurai"
+                        ),
+
+                    /*
+                     * Ataque de katana.
+                     */
+                    attackDamage:
+                        settings.attackDamage ??
+                        2,
+
+                    /*
+                     * Mayor recompensa.
+                     */
+                    scoreValue:
+                        settings.scoreValue ??
+                        175,
+
+                    detectionRange:
+                        settings.detectionRange ??
+                        1200,
+
+                    /*
+                     * Combate cuerpo a cuerpo.
+                     */
+                    attackRange:
+                        settings.attackRange ??
+                        105,
+
+                    attackCooldown:
+                        settings.attackCooldown ??
+                        1500,
+
+                    /*
+                     * Katana ligeramente más larga.
+                     */
+                    attackHitboxWidth:
+                        settings.attackHitboxWidth ??
+                        145,
+
+                    attackHitboxHeight:
+                        settings.attackHitboxHeight ??
+                        65,
+
+                    attackHitboxOffset:
+                        settings.attackHitboxOffset ??
+                        20,
+
+                    decisionInterval:
+                        settings.decisionInterval ??
+                        100,
+
+                    activeAreaMargin:
+                        settings.activeAreaMargin ??
+                        350,
+
+                    entryPadding:
+                        settings.entryPadding ??
+                        55,
+
+                    deathScaleMultiplier:
+                        settings.deathScaleMultiplier ??
+                        0.82
+                }
+            );
     }
 
     // =========================================================
     // Dificultad
     // =========================================================
 
-    getEnemyHealthForCurrentWave() {
+    getEnemySettings(
+        enemyType
+    ) {
+        if (
+            enemyType === "samurai"
+        ) {
+            return (
+                GameSettings.samurai ??
+                {}
+            );
+        }
+
+        return (
+            GameSettings.soldier ??
+            {}
+        );
+    }
+
+    getEnemyHealthForCurrentWave(
+        enemyType = "soldier"
+    ) {
+        const settings =
+            this.getEnemySettings(
+                enemyType
+            );
+
+        const fallback =
+            enemyType === "samurai"
+                ? 5
+                : 3;
+
         const baseHealth =
-            GameSettings
-                .soldier
-                ?.maximumHealth ??
-            3;
+            settings.maximumHealth ??
+            fallback;
 
         const groups =
             Math.floor(
                 Math.max(
                     0,
-                    this.currentWave - 1
+                    this.currentWave -
+                        1
                 ) /
                 this.healthIncreaseEveryWaves
             );
@@ -654,29 +953,42 @@ export default class WaveManager {
         return (
             baseHealth +
             groups *
-            this.healthIncreaseAmount
+                this.healthIncreaseAmount
         );
     }
 
-    getEnemySpeedForCurrentWave() {
+    getEnemySpeedForCurrentWave(
+        enemyType = "soldier"
+    ) {
+        const settings =
+            this.getEnemySettings(
+                enemyType
+            );
+
+        const fallback =
+            enemyType === "samurai"
+                ? 105
+                : 120;
+
         const baseSpeed =
-            GameSettings
-                .soldier
-                ?.moveSpeed ??
-            120;
+            settings.moveSpeed ??
+            fallback;
 
         const bonus =
             Math.min(
                 this.maximumSpeedBonus,
                 Math.max(
                     0,
-                    this.currentWave - 1
+                    this.currentWave -
+                        1
                 ) *
-                this.speedIncreasePerWave
+                    this.speedIncreasePerWave
             );
 
-        return baseSpeed +
-            bonus;
+        return (
+            baseSpeed +
+            bonus
+        );
     }
 
     // =========================================================
@@ -699,11 +1011,17 @@ export default class WaveManager {
             return;
         }
 
-        this.hasFinished = true;
+        this.hasFinished =
+            true;
 
-        this.isRunning = false;
-        this.isSpawning = false;
-        this.waitingForNextWave = false;
+        this.isRunning =
+            false;
+
+        this.isSpawning =
+            false;
+
+        this.waitingForNextWave =
+            false;
 
         this.clearTimers();
 
@@ -726,7 +1044,8 @@ export default class WaveManager {
     }
 
     getCurrentWaveEnemyCount() {
-        return this.totalEnemiesInCurrentWave;
+        return this
+            .totalEnemiesInCurrentWave;
     }
 
     isWaveActive() {
@@ -754,7 +1073,8 @@ export default class WaveManager {
         this.nextWaveTimer
             ?.remove(false);
 
-        this.nextWaveTimer = null;
+        this.nextWaveTimer =
+            null;
 
         for (
             const timer
@@ -765,7 +1085,8 @@ export default class WaveManager {
 
         this.spawnTimers.clear();
 
-        this.pendingSpawns = 0;
+        this.pendingSpawns =
+            0;
     }
 
     // =========================================================
@@ -777,12 +1098,18 @@ export default class WaveManager {
             return;
         }
 
-        this.isDestroyed = true;
-        this.isRunning = false;
+        this.isDestroyed =
+            true;
+
+        this.isRunning =
+            false;
 
         this.clearTimers();
 
-        this.enemyManager = null;
-        this.scene = null;
+        this.enemyManager =
+            null;
+
+        this.scene =
+            null;
     }
 }

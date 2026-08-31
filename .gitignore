@@ -9,3 +9,11 @@ dist/
 
 # Archivos comprimidos de assets: se sube el contenido, no el zip
 *.zip
+
+node_modules/
+dist/
+
+.env
+.env.*
+.DS_Store
+

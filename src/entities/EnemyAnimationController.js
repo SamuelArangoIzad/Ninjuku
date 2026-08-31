@@ -1,167 +1,380 @@
 export default class EnemyAnimationController {
     // =========================================================
-    // Constantes
+    // Tipos de enemigo
+    // =========================================================
+
+    static TYPES = Object.freeze({
+        SOLDIER: "soldier",
+        SAMURAI: "samurai"
+    });
+
+    // =========================================================
+    // Animaciones
     // =========================================================
 
     static ANIMATIONS = Object.freeze({
-        IDLE:
-            "soldier-idle-animation",
+        soldier: Object.freeze({
+            IDLE:
+                "soldier-idle-animation",
 
-        WALK:
-            "soldier-walk-animation",
+            WALK:
+                "soldier-walk-animation",
 
-        ATTACK:
-            "soldier-attack-animation",
+            ATTACK:
+                "soldier-attack-animation",
 
-        HURT:
-            "soldier-hurt-animation",
+            HURT:
+                "soldier-hurt-animation",
 
-        DEATH:
-            "soldier-death-animation"
+            DEATH:
+                "soldier-death-animation"
+        }),
+
+        samurai: Object.freeze({
+            IDLE:
+                "samurai-idle-animation",
+
+            WALK:
+                "samurai-walk-animation",
+
+            ATTACK:
+                "samurai-attack-animation",
+
+            HURT:
+                "samurai-hurt-animation",
+
+            DEATH:
+                "samurai-death-animation"
+        })
     });
 
-    static CONFIGURATIONS =
-        Object.freeze([
-            Object.freeze({
+    // =========================================================
+    // Configuración de animaciones
+    // =========================================================
+
+    static getConfigurations() {
+        return [
+            // =================================================
+            // Soldier
+            // =================================================
+
+            {
+                enemyType:
+                    "soldier",
+
+                animationType:
+                    "IDLE",
+
                 key:
-                    EnemyAnimationController
-                        .ANIMATIONS
-                        .IDLE,
+                    "soldier-idle-animation",
 
                 texturePrefix:
                     "soldier-idle",
 
-                frameOrder:
-                    Object.freeze([
-                        0,
-                        1,
-                        2,
-                        3,
-                        4,
-                        5
-                    ]),
+                startFrame:
+                    0,
+
+                endFrame:
+                    5,
+
+                frameDigits:
+                    2,
 
                 frameRate:
                     6,
 
                 repeat:
                     -1
-            }),
+            },
 
-            Object.freeze({
+            {
+                enemyType:
+                    "soldier",
+
+                animationType:
+                    "WALK",
+
                 key:
-                    EnemyAnimationController
-                        .ANIMATIONS
-                        .WALK,
+                    "soldier-walk-animation",
+
+                /*
+                 * Soldier utiliza actualmente una secuencia
+                 * ping-pong.
+                 */
+                frameOrder: [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    6,
+                    5,
+                    4,
+                    3,
+                    2,
+                    1
+                ],
 
                 texturePrefix:
                     "soldier-walk",
 
-                /*
-                 * Secuencia ping-pong sin repetir los extremos.
-                 */
-                frameOrder:
-                    Object.freeze([
-                        0,
-                        1,
-                        2,
-                        3,
-                        4,
-                        5,
-                        6,
-                        7,
-                        6,
-                        5,
-                        4,
-                        3,
-                        2,
-                        1
-                    ]),
+                frameDigits:
+                    2,
 
                 frameRate:
                     12,
 
                 repeat:
                     -1
-            }),
+            },
 
-            Object.freeze({
+            {
+                enemyType:
+                    "soldier",
+
+                animationType:
+                    "ATTACK",
+
                 key:
-                    EnemyAnimationController
-                        .ANIMATIONS
-                        .ATTACK,
+                    "soldier-attack-animation",
 
                 texturePrefix:
                     "soldier-attack",
 
-                frameOrder:
-                    Object.freeze([
-                        0,
-                        1,
-                        2,
-                        3,
-                        4,
-                        5,
-                        6
-                    ]),
+                startFrame:
+                    0,
+
+                endFrame:
+                    6,
+
+                frameDigits:
+                    2,
 
                 frameRate:
                     12,
 
                 repeat:
                     0
-            }),
+            },
 
-            Object.freeze({
+            {
+                enemyType:
+                    "soldier",
+
+                animationType:
+                    "HURT",
+
                 key:
-                    EnemyAnimationController
-                        .ANIMATIONS
-                        .HURT,
+                    "soldier-hurt-animation",
 
                 texturePrefix:
                     "soldier-hurt",
 
-                frameOrder:
-                    Object.freeze([
-                        0,
-                        1,
-                        2,
-                        3
-                    ]),
+                startFrame:
+                    0,
+
+                endFrame:
+                    3,
+
+                frameDigits:
+                    2,
 
                 frameRate:
                     10,
 
                 repeat:
                     0
-            }),
+            },
 
-            Object.freeze({
+            {
+                enemyType:
+                    "soldier",
+
+                animationType:
+                    "DEATH",
+
                 key:
-                    EnemyAnimationController
-                        .ANIMATIONS
-                        .DEATH,
+                    "soldier-death-animation",
 
                 texturePrefix:
                     "soldier-death",
 
-                frameOrder:
-                    Object.freeze([
-                        0,
-                        1,
-                        2,
-                        3,
-                        4,
-                        5
-                    ]),
+                startFrame:
+                    0,
+
+                endFrame:
+                    5,
+
+                frameDigits:
+                    2,
 
                 frameRate:
                     7,
 
                 repeat:
                     0
-            })
-        ]);
+            },
+
+            // =================================================
+            // Samurai
+            // =================================================
+
+            {
+                enemyType:
+                    "samurai",
+
+                animationType:
+                    "IDLE",
+
+                key:
+                    "samurai-idle-animation",
+
+                texturePrefix:
+                    "samurai-idle",
+
+                /*
+                 * Tus archivos Samurai empiezan en 1:
+                 *
+                 * samuIdle1.png
+                 * ...
+                 * samuIdle7.png
+                 */
+                startFrame:
+                    1,
+
+                endFrame:
+                    7,
+
+                frameDigits:
+                    2,
+
+                frameRate:
+                    8,
+
+                repeat:
+                    -1
+            },
+
+            {
+                enemyType:
+                    "samurai",
+
+                animationType:
+                    "WALK",
+
+                key:
+                    "samurai-walk-animation",
+
+                texturePrefix:
+                    "samurai-walk",
+
+                startFrame:
+                    1,
+
+                endFrame:
+                    8,
+
+                frameDigits:
+                    2,
+
+                frameRate:
+                    10,
+
+                repeat:
+                    -1
+            },
+
+            {
+                enemyType:
+                    "samurai",
+
+                animationType:
+                    "ATTACK",
+
+                key:
+                    "samurai-attack-animation",
+
+                texturePrefix:
+                    "samurai-attack",
+
+                startFrame:
+                    1,
+
+                endFrame:
+                    7,
+
+                frameDigits:
+                    2,
+
+                frameRate:
+                    12,
+
+                repeat:
+                    0
+            },
+
+            {
+                enemyType:
+                    "samurai",
+
+                animationType:
+                    "HURT",
+
+                key:
+                    "samurai-hurt-animation",
+
+                texturePrefix:
+                    "samurai-hurt",
+
+                startFrame:
+                    1,
+
+                endFrame:
+                    5,
+
+                frameDigits:
+                    2,
+
+                frameRate:
+                    12,
+
+                repeat:
+                    0
+            },
+
+            {
+                enemyType:
+                    "samurai",
+
+                animationType:
+                    "DEATH",
+
+                key:
+                    "samurai-death-animation",
+
+                texturePrefix:
+                    "samurai-death",
+
+                startFrame:
+                    1,
+
+                endFrame:
+                    7,
+
+                frameDigits:
+                    2,
+
+                frameRate:
+                    10,
+
+                repeat:
+                    0
+            }
+        ];
+    }
 
     // =========================================================
     // Registro global
@@ -181,13 +394,16 @@ export default class EnemyAnimationController {
             return false;
         }
 
+        const configurations =
+            EnemyAnimationController
+                .getConfigurations();
+
         let allCreated =
             true;
 
         for (
             const configuration
-            of EnemyAnimationController
-                .CONFIGURATIONS
+            of configurations
         ) {
             const created =
                 EnemyAnimationController
@@ -226,17 +442,12 @@ export default class EnemyAnimationController {
         const {
             key,
             texturePrefix,
-            frameOrder,
             frameRate,
             repeat
         } = configuration;
 
         /*
-         * No se elimina una animación existente.
-         *
-         * Las animaciones de Phaser son globales. Eliminarlas
-         * mientras hay sprites utilizándolas puede provocar
-         * reinicios, referencias inválidas y trabajo adicional.
+         * Las animaciones Phaser son globales.
          */
         if (
             scene.anims.exists(
@@ -246,24 +457,42 @@ export default class EnemyAnimationController {
             return true;
         }
 
+        const frameOrder =
+            EnemyAnimationController
+                .resolveFrameOrder(
+                    configuration
+                );
+
         const frames =
             EnemyAnimationController
                 .buildFrames(
                     scene,
                     texturePrefix,
-                    frameOrder
+                    frameOrder,
+                    configuration
+                        .frameDigits ??
+                        2
                 );
 
         if (!frames) {
+            console.error(
+                "[EnemyAnimationController] " +
+                `No se pudieron construir los frames: ${key}`
+            );
+
             return false;
         }
 
         const animation =
             scene.anims.create({
                 key,
+
                 frames,
+
                 frameRate,
+
                 repeat,
+
                 skipMissedFrames:
                     true
             });
@@ -277,16 +506,79 @@ export default class EnemyAnimationController {
             return false;
         }
 
+        console.log(
+            "[EnemyAnimationController] " +
+            `Animación creada: ${key}`
+        );
+
         return true;
+    }
+
+    // =========================================================
+    // Frames
+    // =========================================================
+
+    static resolveFrameOrder(
+        configuration
+    ) {
+        if (
+            Array.isArray(
+                configuration
+                    .frameOrder
+            ) &&
+            configuration
+                .frameOrder
+                .length > 0
+        ) {
+            return configuration
+                .frameOrder;
+        }
+
+        const start =
+            Number(
+                configuration
+                    .startFrame
+            );
+
+        const end =
+            Number(
+                configuration
+                    .endFrame
+            );
+
+        if (
+            !Number.isFinite(start) ||
+            !Number.isFinite(end) ||
+            end < start
+        ) {
+            return [];
+        }
+
+        const frames = [];
+
+        for (
+            let frame = start;
+            frame <= end;
+            frame += 1
+        ) {
+            frames.push(
+                frame
+            );
+        }
+
+        return frames;
     }
 
     static buildFrames(
         scene,
         texturePrefix,
-        frameOrder
+        frameOrder,
+        frameDigits = 2
     ) {
         if (
-            !Array.isArray(frameOrder) ||
+            !Array.isArray(
+                frameOrder
+            ) ||
             frameOrder.length === 0
         ) {
             console.error(
@@ -299,12 +591,16 @@ export default class EnemyAnimationController {
 
         const frames = [];
 
-        for (const index of frameOrder) {
+        for (
+            const index
+            of frameOrder
+        ) {
             const frameNumber =
-                String(index).padStart(
-                    2,
-                    "0"
-                );
+                String(index)
+                    .padStart(
+                        frameDigits,
+                        "0"
+                    );
 
             const textureKey =
                 `${texturePrefix}-${frameNumber}`;
@@ -335,15 +631,83 @@ export default class EnemyAnimationController {
     // Instancia
     // =========================================================
 
-    constructor(sprite) {
+    constructor(
+        sprite,
+        enemyType = "soldier"
+    ) {
         this.sprite =
             sprite ?? null;
+
+        this.enemyType =
+            this.normalizeEnemyType(
+                enemyType
+            );
 
         this.currentAnimation =
             null;
 
         this.isDestroyed =
             false;
+    }
+
+    // =========================================================
+    // Tipo
+    // =========================================================
+
+    normalizeEnemyType(type) {
+        return (
+            String(type)
+                .toLowerCase() ===
+            "samurai"
+        )
+            ? "samurai"
+            : "soldier";
+    }
+
+    setEnemyType(type) {
+        if (
+            this.isDestroyed
+        ) {
+            return false;
+        }
+
+        const nextType =
+            this.normalizeEnemyType(
+                type
+            );
+
+        if (
+            this.enemyType ===
+            nextType
+        ) {
+            return false;
+        }
+
+        this.stop();
+
+        this.enemyType =
+            nextType;
+
+        this.currentAnimation =
+            null;
+
+        return true;
+    }
+
+    getEnemyType() {
+        return this.enemyType;
+    }
+
+    getAnimationKey(
+        animationType
+    ) {
+        return (
+            EnemyAnimationController
+                .ANIMATIONS
+                [this.enemyType]
+                ?.[animationType] ??
+            null
+        );
     }
 
     // =========================================================
@@ -357,7 +721,8 @@ export default class EnemyAnimationController {
         if (
             this.isDestroyed ||
             !this.sprite?.active ||
-            !this.sprite.anims
+            !this.sprite.anims ||
+            !animationKey
         ) {
             return false;
         }
@@ -379,7 +744,7 @@ export default class EnemyAnimationController {
             this.getCurrentAnimation();
 
         /*
-         * Idle y walk no se reinician si ya están seleccionadas.
+         * Idle y walk no se reinician continuamente.
          */
         if (
             !forceRestart &&
@@ -390,13 +755,16 @@ export default class EnemyAnimationController {
                 animationKey;
 
             if (
-                !this.sprite.anims
+                !this.sprite
+                    .anims
                     .isPlaying
             ) {
-                this.sprite.anims.play(
-                    animationKey,
-                    true
-                );
+                this.sprite
+                    .anims
+                    .play(
+                        animationKey,
+                        true
+                    );
             }
 
             return true;
@@ -405,19 +773,19 @@ export default class EnemyAnimationController {
         this.currentAnimation =
             animationKey;
 
-        /*
-         * ignoreIfPlaying es false cuando se necesita reiniciar
-         * ataque, daño o muerte desde el primer frame.
-         */
-        this.sprite.anims.play(
-            animationKey,
-            !forceRestart
-        );
+        this.sprite
+            .anims
+            .play(
+                animationKey,
+                !forceRestart
+            );
 
         return true;
     }
 
-    animationExists(animationKey) {
+    animationExists(
+        animationKey
+    ) {
         const animationManager =
             this.sprite
                 ?.anims
@@ -437,52 +805,49 @@ export default class EnemyAnimationController {
 
     playIdle() {
         return this.play(
-            EnemyAnimationController
-                .ANIMATIONS
-                .IDLE
+            this.getAnimationKey(
+                "IDLE"
+            )
         );
     }
 
     playWalk() {
         return this.play(
-            EnemyAnimationController
-                .ANIMATIONS
-                .WALK
+            this.getAnimationKey(
+                "WALK"
+            )
         );
     }
 
     playAttack() {
         return this.play(
-            EnemyAnimationController
-                .ANIMATIONS
-                .ATTACK,
-
+            this.getAnimationKey(
+                "ATTACK"
+            ),
             true
         );
     }
 
     playHurt() {
         return this.play(
-            EnemyAnimationController
-                .ANIMATIONS
-                .HURT,
-
+            this.getAnimationKey(
+                "HURT"
+            ),
             true
         );
     }
 
     playDeath() {
         return this.play(
-            EnemyAnimationController
-                .ANIMATIONS
-                .DEATH,
-
+            this.getAnimationKey(
+                "DEATH"
+            ),
             true
         );
     }
 
     // =========================================================
-    // Consultas y control
+    // Consultas
     // =========================================================
 
     getCurrentAnimation() {
@@ -495,10 +860,13 @@ export default class EnemyAnimationController {
         );
     }
 
-    isPlaying(animationKey = null) {
+    isPlaying(
+        animationKey = null
+    ) {
         if (
             this.isDestroyed ||
-            !this.sprite?.anims
+            !this.sprite
+                ?.anims
                 ?.isPlaying
         ) {
             return false;
@@ -522,15 +890,25 @@ export default class EnemyAnimationController {
             return;
         }
 
-        this.sprite.anims.stop();
+        this.sprite
+            .anims
+            .stop();
 
         this.currentAnimation =
             null;
     }
 
     reset() {
+        if (
+            this.isDestroyed
+        ) {
+            return false;
+        }
+
         this.currentAnimation =
             null;
+
+        return true;
     }
 
     // =========================================================
@@ -538,20 +916,15 @@ export default class EnemyAnimationController {
     // =========================================================
 
     destroy() {
-        if (this.isDestroyed) {
+        if (
+            this.isDestroyed
+        ) {
             return;
         }
 
         this.isDestroyed =
             true;
 
-        /*
-         * No se llama stop() aquí.
-         *
-         * Enemy.destroy() destruye inmediatamente el sprite, por
-         * lo que detener manualmente su AnimationState produce
-         * trabajo innecesario.
-         */
         this.sprite =
             null;
 

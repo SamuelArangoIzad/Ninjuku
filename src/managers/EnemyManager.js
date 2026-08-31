@@ -1,6 +1,9 @@
 import Enemy
     from "../entities/Enemy.js";
 
+import { Samurai }
+    from "../entities/Samurai.js";
+
 import GameSettings
     from "../config/GameSettings.js";
 
@@ -26,15 +29,21 @@ export default class EnemyManager {
         // =====================================================
 
         /*
-         * Enemigos activos.
+         * Todos los enemigos activos:
          *
-         * CombatSystem conserva esta referencia, por lo que
-         * nunca se debe reemplazar este arreglo.
+         * - soldier
+         * - samurai
+         *
+         * CombatSystem conserva la referencia a este arreglo,
+         * por lo que NUNCA debe reemplazarse.
          */
         this.enemies = [];
 
         /*
-         * Enemigos desactivados disponibles para reutilización.
+         * Pool compartido.
+         *
+         * Cada enemigo tiene enemyType para impedir que un
+         * Soldier sea reutilizado como Samurai o viceversa.
          */
         this.enemyPool = [];
 
@@ -91,10 +100,6 @@ export default class EnemyManager {
             enemySettings.poolingEnabled ??
             true;
 
-        /*
-         * Distancia adicional fuera de la pantalla
-         * utilizada para la aparición de enemigos.
-         */
         this.spawnOffset =
             this.normalizeNonNegativeNumber(
                 configuration.spawnOffset ??
@@ -161,6 +166,23 @@ export default class EnemyManager {
         return "RIGHT";
     }
 
+    normalizeEnemyType(
+        type
+    ) {
+        const normalized =
+            String(
+                type ?? "soldier"
+            ).toLowerCase();
+
+        if (
+            normalized === "samurai"
+        ) {
+            return "samurai";
+        }
+
+        return "soldier";
+    }
+
     // =========================================================
     // Dependencias
     // =========================================================
@@ -205,10 +227,11 @@ export default class EnemyManager {
     }
 
     // =========================================================
-    // Aparición
+    // Aparición genérica
     // =========================================================
 
-    spawnSoldier(
+    spawnEnemy(
+        enemyType,
         x,
         y,
         configuration = {}
@@ -220,6 +243,11 @@ export default class EnemyManager {
         ) {
             return null;
         }
+
+        const normalizedType =
+            this.normalizeEnemyType(
+                enemyType
+            );
 
         const spawnSide =
             this.normalizeSpawnSide(
@@ -242,18 +270,18 @@ export default class EnemyManager {
                     5
                 );
 
-        /*
-         * La dirección de entrada se conserva dentro de la
-         * configuración para Enemy y SoldierAI.
-         */
         const enemyConfiguration = {
             ...configuration,
+
+            enemyType:
+                normalizedType,
 
             spawnSide
         };
 
         const enemy =
             this.acquireEnemy(
+                normalizedType,
                 validX,
                 validY,
                 enemyConfiguration
@@ -262,6 +290,12 @@ export default class EnemyManager {
         if (!enemy) {
             return null;
         }
+
+        /*
+         * Marcador persistente requerido por el pool.
+         */
+        enemy.enemyType =
+            normalizedType;
 
         this.enemies.push(
             enemy
@@ -278,6 +312,44 @@ export default class EnemyManager {
 
         return enemy;
     }
+
+    // =========================================================
+    // Soldier
+    // =========================================================
+
+    spawnSoldier(
+        x,
+        y,
+        configuration = {}
+    ) {
+        return this.spawnEnemy(
+            "soldier",
+            x,
+            y,
+            configuration
+        );
+    }
+
+    // =========================================================
+    // Samurai
+    // =========================================================
+
+    spawnSamurai(
+        x,
+        y,
+        configuration = {}
+    ) {
+        return this.spawnEnemy(
+            "samurai",
+            x,
+            y,
+            configuration
+        );
+    }
+
+    // =========================================================
+    // Posición de aparición
+    // =========================================================
 
     getSpawnX(
         spawnSide
@@ -319,7 +391,44 @@ export default class EnemyManager {
         );
     }
 
+    // =========================================================
+    // Pool
+    // =========================================================
+
+    findPooledEnemyIndex(
+        enemyType
+    ) {
+        const normalizedType =
+            this.normalizeEnemyType(
+                enemyType
+            );
+
+        for (
+            let index =
+                this.enemyPool.length - 1;
+
+            index >= 0;
+
+            index -= 1
+        ) {
+            const enemy =
+                this.enemyPool[index];
+
+            if (
+                this.normalizeEnemyType(
+                    enemy?.enemyType
+                ) ===
+                normalizedType
+            ) {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
     acquireEnemy(
+        enemyType,
         x,
         y,
         configuration = {}
@@ -332,6 +441,11 @@ export default class EnemyManager {
             return null;
         }
 
+        const normalizedType =
+            this.normalizeEnemyType(
+                enemyType
+            );
+
         let enemy =
             null;
 
@@ -339,28 +453,46 @@ export default class EnemyManager {
             this.poolingEnabled &&
             this.enemyPool.length > 0
         ) {
-            enemy =
-                this.enemyPool.pop();
-
-            const activated =
-                enemy?.activate?.(
-                    x,
-                    y,
-                    this.player,
-                    configuration
+            const poolIndex =
+                this.findPooledEnemyIndex(
+                    normalizedType
                 );
 
-            if (!activated) {
-                enemy?.destroy?.();
-
+            if (
+                poolIndex >= 0
+            ) {
                 enemy =
-                    null;
+                    this.enemyPool.splice(
+                        poolIndex,
+                        1
+                    )[0];
+
+                const activated =
+                    enemy?.activate?.(
+                        x,
+                        y,
+                        this.player,
+                        {
+                            ...configuration,
+
+                            enemyType:
+                                normalizedType
+                        }
+                    );
+
+                if (!activated) {
+                    enemy?.destroy?.();
+
+                    enemy =
+                        null;
+                }
             }
         }
 
         if (!enemy) {
             enemy =
                 this.createEnemy(
+                    normalizedType,
                     x,
                     y,
                     configuration
@@ -370,6 +502,9 @@ export default class EnemyManager {
         if (!enemy) {
             return null;
         }
+
+        enemy.enemyType =
+            normalizedType;
 
         enemy.setOnDeathFinished?.(
             this.handleEnemyDeathFinished,
@@ -380,6 +515,7 @@ export default class EnemyManager {
     }
 
     createEnemy(
+        enemyType,
         x,
         y,
         configuration = {}
@@ -392,14 +528,49 @@ export default class EnemyManager {
             return null;
         }
 
-        const enemy =
-            new Enemy(
-                this.scene,
-                x,
-                y,
-                this.player,
-                configuration
+        const normalizedType =
+            this.normalizeEnemyType(
+                enemyType
             );
+
+        let enemy =
+            null;
+
+        if (
+            normalizedType ===
+            "samurai"
+        ) {
+            enemy =
+                new Samurai(
+                    this.scene,
+                    x,
+                    y,
+                    this.player,
+                    {
+                        ...configuration,
+
+                        enemyType:
+                            "samurai"
+                    }
+                );
+        } else {
+            enemy =
+                new Enemy(
+                    this.scene,
+                    x,
+                    y,
+                    this.player,
+                    {
+                        ...configuration,
+
+                        enemyType:
+                            "soldier"
+                    }
+                );
+        }
+
+        enemy.enemyType =
+            normalizedType;
 
         enemy.setOnDeathFinished?.(
             this.handleEnemyDeathFinished,
@@ -425,7 +596,7 @@ export default class EnemyManager {
     };
 
     // =========================================================
-    // Liberación y pooling
+    // Liberación
     // =========================================================
 
     releaseEnemy(enemy) {
@@ -441,7 +612,9 @@ export default class EnemyManager {
                 enemy
             );
 
-        if (index < 0) {
+        if (
+            index < 0
+        ) {
             return false;
         }
 
@@ -508,7 +681,9 @@ export default class EnemyManager {
                 enemy
             );
 
-        if (index < 0) {
+        if (
+            index < 0
+        ) {
             return false;
         }
 
@@ -589,7 +764,7 @@ export default class EnemyManager {
                 );
 
             /*
-             * ENTERING tiene prioridad sobre culling.
+             * La entrada tiene prioridad sobre el culling.
              */
             if (isEntering) {
                 this.updateEnteringEnemy(
@@ -672,13 +847,6 @@ export default class EnemyManager {
                 );
 
         if (isOutside) {
-            /*
-             * Mientras el enemigo está fuera de pantalla:
-             *
-             * - no cae;
-             * - mantiene la altura correcta;
-             * - conserva el movimiento horizontal.
-             */
             if (
                 sprite.body.allowGravity
             ) {
@@ -1108,11 +1276,6 @@ export default class EnemyManager {
                     );
                 }
             } else {
-                /*
-                 * No forzamos a todos los enemigos a quedar
-                 * dentro de la pantalla. Pueden perseguir al
-                 * jugador desde ambos lados.
-                 */
                 const minimumX =
                     visibleLeft -
                     this.activeAreaMargin;
@@ -1257,6 +1420,12 @@ export default class EnemyManager {
             return 0;
         }
 
+        const enemyType =
+            this.normalizeEnemyType(
+                configuration.enemyType ??
+                    "soldier"
+            );
+
         const requestedAmount =
             Math.min(
                 this.maximumPoolSize,
@@ -1269,18 +1438,34 @@ export default class EnemyManager {
                 )
             );
 
+        let existingTypeCount =
+            this.enemyPool.filter(
+                (enemy) =>
+                    this.normalizeEnemyType(
+                        enemy?.enemyType
+                    ) ===
+                    enemyType
+            ).length;
+
         let created =
             0;
 
         while (
+            existingTypeCount <
+                requestedAmount &&
             this.enemyPool.length <
-            requestedAmount
+                this.maximumPoolSize
         ) {
             const enemy =
                 this.createEnemy(
+                    enemyType,
                     -1000,
                     -1000,
-                    configuration
+                    {
+                        ...configuration,
+
+                        enemyType
+                    }
                 );
 
             if (!enemy) {
@@ -1299,6 +1484,9 @@ export default class EnemyManager {
             this.enemyPool.push(
                 enemy
             );
+
+            existingTypeCount +=
+                1;
 
             created +=
                 1;
@@ -1375,6 +1563,23 @@ export default class EnemyManager {
         return this.enemies;
     }
 
+    getEnemiesByType(
+        enemyType
+    ) {
+        const normalizedType =
+            this.normalizeEnemyType(
+                enemyType
+            );
+
+        return this.enemies.filter(
+            (enemy) =>
+                this.normalizeEnemyType(
+                    enemy?.enemyType
+                ) ===
+                normalizedType
+        );
+    }
+
     getAliveEnemies() {
         return this.enemies.filter(
             (enemy) =>
@@ -1404,7 +1609,9 @@ export default class EnemyManager {
             const enemy
             of this.enemies
         ) {
-            if (enemy?.isAlive?.()) {
+            if (
+                enemy?.isAlive?.()
+            ) {
                 count +=
                     1;
             }
@@ -1415,6 +1622,23 @@ export default class EnemyManager {
 
     getPoolSize() {
         return this.enemyPool.length;
+    }
+
+    getPoolSizeByType(
+        enemyType
+    ) {
+        const normalizedType =
+            this.normalizeEnemyType(
+                enemyType
+            );
+
+        return this.enemyPool.filter(
+            (enemy) =>
+                this.normalizeEnemyType(
+                    enemy?.enemyType
+                ) ===
+                normalizedType
+        ).length;
     }
 
     getTotalManagedEnemyCount() {
