@@ -95,7 +95,11 @@ export default class Controls {
 
                 run:
                     Phaser.Input.Keyboard
-                        .KeyCodes.SHIFT
+                        .KeyCodes.SHIFT,
+
+                grapple:
+                    Phaser.Input.Keyboard
+                        .KeyCodes.H
             });
 
         // =====================================================
@@ -696,6 +700,16 @@ export default class Controls {
         return (
             keyboardJump ||
             touchJump
+        );
+    }
+
+    /*
+     * Kusarigama. La misma tecla engancha y suelta, asi que solo
+     * interesa el instante de la pulsacion, no si sigue apretada.
+     */
+    grapple() {
+        return Phaser.Input.Keyboard.JustDown(
+            this.keys.grapple
         );
     }
 

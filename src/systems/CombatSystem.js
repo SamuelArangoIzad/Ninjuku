@@ -26,6 +26,21 @@ export default class CombatSystem {
                 ? enemies
                 : [];
 
+        /*
+         * Enemigos que no gestiona EnemyManager pero que el jugador
+         * tiene que poder golpear igual: los lanzadores apostados en
+         * los tejados, que viven montados sobre las casas y no en las
+         * oleadas.
+         */
+        this.getExtraEnemies =
+            configuration.getExtraEnemies ??
+            (() => []);
+
+        /*
+         * Lista reutilizable, para no reservar memoria cada golpe.
+         */
+        this.damageableBuffer = [];
+
         // =====================================================
         // Ataques del jugador
         // =====================================================
@@ -249,7 +264,10 @@ export default class CombatSystem {
             attackBounds.right +
             this.playerBroadPhaseMargin;
 
-        for (const enemy of this.enemies) {
+        for (
+            const enemy
+            of this.collectDamageable()
+        ) {
             if (
                 !enemy?.isAlive?.() ||
                 this.playerHitEnemies.has(
@@ -693,6 +711,29 @@ export default class CombatSystem {
     // Destrucción
     // =========================================================
 
+    /*
+     * Todos los enemigos a los que el jugador puede pegar: los de las
+     * oleadas mas los de tejado.
+     */
+    collectDamageable() {
+        const lista = this.damageableBuffer;
+
+        lista.length = 0;
+
+        for (const enemy of this.enemies ?? []) {
+            lista.push(enemy);
+        }
+
+        for (
+            const enemy
+            of this.getExtraEnemies?.() ?? []
+        ) {
+            lista.push(enemy);
+        }
+
+        return lista;
+    }
+
     destroy() {
         if (this.isDestroyed) {
             return;
@@ -723,6 +764,8 @@ export default class CombatSystem {
 
         this.player =
             null;
+
+        this.damageableBuffer.length = 0;
 
         /*
          * No se vacía el arreglo original porque pertenece

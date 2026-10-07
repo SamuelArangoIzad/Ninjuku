@@ -92,6 +92,25 @@ const GameSettings = {
     },
 
     // =========================================================
+    // Objeto colgado de las ramas
+    // =========================================================
+
+    hangingProp: {
+        textureKey: "hanging-prop",
+
+        /*
+         * Delante del fondo (-100) y detras de todo lo demas.
+         */
+        depth: -50,
+
+        /*
+         * Multiplica la escala del propio fondo. Cuelga de una rama
+         * pintada en el fondo, asi que crece y encoge con el.
+         */
+        scale: 1
+    },
+
+    // =========================================================
     // Jugador
     // =========================================================
 

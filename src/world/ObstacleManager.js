@@ -291,6 +291,14 @@ export default class ObstacleManager {
 
         this.obstacles = [];
 
+        /*
+         * Contador para dar identidad estable a cada pareja. Otros
+         * sistemas montan cosas encima de una casa concreta (enemigos,
+         * puntos de enganche) y necesitan saber si sigue siendo la
+         * misma o ya se reciclo y ahora es otra.
+         */
+        this.obstacleSerial = 0;
+
         this.sequenceIndex = 0;
 
         this.groundY = 0;
@@ -562,12 +570,24 @@ export default class ObstacleManager {
     }
 
     createObstacle() {
-        return {
+        const obstacle = {
             platform: this.createPiece(),
             house: this.createPiece(),
             x: 0,
-            width: 0
+            width: 0,
+            serial: this.obstacleSerial
         };
+
+        this.obstacleSerial += 1;
+
+        return obstacle;
+    }
+
+    /*
+     * Parejas vivas, en orden de izquierda a derecha.
+     */
+    getObstacles() {
+        return this.obstacles;
     }
 
     /*
@@ -576,6 +596,14 @@ export default class ObstacleManager {
      */
     applyNextPair(obstacle) {
         const order = this.sequenceIndex;
+
+        /*
+         * Al reciclarse deja de ser la misma pareja, aunque reutilice
+         * los mismos objetos.
+         */
+        obstacle.serial = this.obstacleSerial;
+
+        this.obstacleSerial += 1;
 
         const houseKey =
             this.sequence[

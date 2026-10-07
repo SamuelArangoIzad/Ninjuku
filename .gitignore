@@ -17,3 +17,6 @@ dist/
 .env.*
 .DS_Store
 
+
+# Imagenes de verificacion que generan las herramientas
+anclas_*.png

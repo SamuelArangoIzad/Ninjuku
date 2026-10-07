@@ -27,6 +27,24 @@ import Ground
 import ObstacleManager
     from "../world/ObstacleManager.js";
 
+import HangingPropManager
+    from "../world/HangingPropManager.js";
+
+import GrappleController
+    from "../entities/GrappleController.js";
+
+import ShurikenSystem
+    from "../entities/ShurikenSystem.js";
+
+import RoofEnemyManager
+    from "../world/RoofEnemyManager.js";
+
+import HookRegistry
+    from "../world/HookRegistry.js";
+
+import { isOutOfCamera }
+    from "../systems/CameraBounds.js";
+
 import CombatSystem
     from "../systems/CombatSystem.js";
 
@@ -85,6 +103,24 @@ export default class GameScene extends Phaser.Scene {
             null;
 
         this.obstacleManager =
+            null;
+
+        this.hangingPropManager =
+            null;
+
+        this.grappleController =
+            null;
+
+        this.shurikenSystem =
+            null;
+
+        this.enemyShurikenSystem =
+            null;
+
+        this.roofEnemyManager =
+            null;
+
+        this.hookRegistry =
             null;
 
         // =====================================================
@@ -181,6 +217,8 @@ export default class GameScene extends Phaser.Scene {
     preload() {
         this.loadBackgroundAssets();
         this.loadObstacleAssets();
+        this.loadGrappleAssets();
+        this.loadShurikenAssets();
         this.loadPlayerAssets();
         this.loadEnemyAssets();
     }
@@ -270,6 +308,90 @@ export default class GameScene extends Phaser.Scene {
             "platform-high",
             `${folder}/platformJump2.png`
         );
+
+        /*
+         * Objeto que cuelga de las ramas de cerezo del fondo.
+         */
+        this.load.image(
+            "hanging-prop",
+            `${folder}/sprite-5.png`
+        );
+    }
+
+    // =========================================================
+    // Recursos del shuriken
+    // =========================================================
+
+    loadShurikenAssets() {
+        this.load.spritesheet(
+            "shuriken",
+            "/assets/player/generated/shuriken.png",
+            {
+                frameWidth: 94,
+                frameHeight: 110
+            }
+        );
+
+        this.load.spritesheet(
+            "soldier-shuriken",
+            "/assets/player/generated/soldier-shuriken.png",
+            {
+                frameWidth: 260,
+                frameHeight: 199
+            }
+        );
+
+        this.load.spritesheet(
+            "soldier-shuriken-hurt",
+            "/assets/player/generated/soldier-shuriken-hurt.png",
+            {
+                frameWidth: 136,
+                frameHeight: 184
+            }
+        );
+
+        this.load.spritesheet(
+            "soldier-shuriken-death",
+            "/assets/player/generated/soldier-shuriken-death.png",
+            {
+                frameWidth: 209,
+                frameHeight: 150
+            }
+        );
+    }
+
+    // =========================================================
+    // Recursos del kusarigama
+    // =========================================================
+
+    /*
+     * Hojas generadas con tools/preparar_animaciones.py a partir de
+     * los PNG sueltos, que venian cada uno con un tamano distinto.
+     */
+    loadGrappleAssets() {
+        const folder =
+            "/assets/player/generated";
+
+        const sheets = [
+            ["kusarigama-launch", 142, 303],
+            ["kusarigama-land", 173, 141],
+            ["kusarigama-swing-left", 294, 336],
+            ["kusarigama-swing-right", 320, 333]
+        ];
+
+        for (
+            const [key, frameWidth, frameHeight]
+            of sheets
+        ) {
+            this.load.spritesheet(
+                key,
+                `${folder}/${key}.png`,
+                {
+                    frameWidth,
+                    frameHeight
+                }
+            );
+        }
     }
 
     // =========================================================
@@ -799,6 +921,24 @@ export default class GameScene extends Phaser.Scene {
         this.backgroundManager.create();
 
         // =====================================================
+        // Objeto colgado de las ramas
+        // =====================================================
+
+        this.hangingPropManager =
+            new HangingPropManager(
+                this,
+                {
+                    backgroundManager:
+                        this.backgroundManager,
+
+                    textureKey:
+                        "hanging-prop"
+                }
+            );
+
+        this.hangingPropManager.create();
+
+        // =====================================================
         // Animaciones
         // =====================================================
 
@@ -915,6 +1055,93 @@ export default class GameScene extends Phaser.Scene {
         this.obstacleManager.create();
 
         // =====================================================
+        // Kusarigama
+        // =====================================================
+
+        this.shurikenSystem =
+            new ShurikenSystem(
+                this,
+                {
+                    getEnemies:
+                        () =>
+                            this.getAllEnemies()
+                }
+            );
+
+        this.shurikenSystem.create();
+
+        // =====================================================
+        // Enemigos de tejado
+        // =====================================================
+
+        /*
+         * Sistema aparte para los shuriken enemigos: apunta al
+         * jugador en vez de a los enemigos. El envoltorio adapta al
+         * jugador a la interfaz que espera ShurikenSystem.
+         */
+        this.enemyShurikenSystem =
+            new ShurikenSystem(
+                this,
+                {
+                    getEnemies:
+                        () =>
+                            this.getPlayerAsTarget(),
+
+                    speed: 420,
+                    depth: 8
+                }
+            );
+
+        this.enemyShurikenSystem.create();
+
+        this.roofEnemyManager =
+            new RoofEnemyManager(
+                this,
+                {
+                    obstacleManager:
+                        this.obstacleManager,
+
+                    shurikenSystem:
+                        this.enemyShurikenSystem,
+
+                    getPlayerSprite:
+                        () =>
+                            this.player
+                                ?.getSprite?.() ??
+                            null
+                }
+            );
+
+        this.roofEnemyManager.create();
+
+        /*
+         * El kusarigama busca entre los dos tipos de enganche: los
+         * colgantes de las ramas y los que acompanan a cada enemigo.
+         */
+        this.hookRegistry =
+            new HookRegistry([
+                this.hangingPropManager,
+                this.roofEnemyManager
+            ]);
+
+        this.grappleController =
+            new GrappleController(
+                this,
+                {
+                    player:
+                        this.player,
+
+                    hangingPropManager:
+                        this.hookRegistry,
+
+                    shurikenSystem:
+                        this.shurikenSystem
+                }
+            );
+
+        this.grappleController.create();
+
+        // =====================================================
         // Sistemas
         // =====================================================
 
@@ -922,7 +1149,14 @@ export default class GameScene extends Phaser.Scene {
             new CombatSystem(
                 this,
                 this.player,
-                this.enemyManager.getEnemies()
+                this.enemyManager.getEnemies(),
+                {
+                    getExtraEnemies:
+                        () =>
+                            this.roofEnemyManager
+                                ?.getEnemies?.() ??
+                            []
+                }
             );
 
         this.entityUIManager =
@@ -932,6 +1166,11 @@ export default class GameScene extends Phaser.Scene {
                     player:
                         this.player
                 }
+            );
+
+        this.roofEnemyManager
+            ?.setHealthBarSystem?.(
+                this.entityUIManager
             );
 
         this.scoreSystem =
@@ -1170,6 +1409,13 @@ export default class GameScene extends Phaser.Scene {
                 delta
             );
 
+        /*
+         * Va despues del fondo: sus posiciones se derivan de donde han
+         * quedado los paneles en este mismo fotograma.
+         */
+        this.hangingPropManager
+            ?.update();
+
         const playerIsAlive =
             Boolean(
                 this.player &&
@@ -1185,9 +1431,30 @@ export default class GameScene extends Phaser.Scene {
             this.handleGameOver();
         }
 
+        /*
+         * El kusarigama va antes: mientras dura el enganche toma el
+         * mando y el jugador no debe leer los controles normales.
+         */
+        this.grappleController
+            ?.update(
+                delta,
+                this.controls
+            );
+
+        this.roofEnemyManager
+            ?.update(delta, time);
+
+        this.shurikenSystem
+            ?.update(delta);
+
+        this.enemyShurikenSystem
+            ?.update(delta);
+
         if (
             playerIsAlive &&
-            this.controls
+            this.controls &&
+            !this.grappleController
+                ?.suspendsPlayer?.()
         ) {
             this.player.update(
                 this.controls
@@ -1214,6 +1481,10 @@ export default class GameScene extends Phaser.Scene {
                 delta
             );
 
+        if (playerIsAlive) {
+            this.enforceCameraBounds();
+        }
+
         /*
          * Las posiciones de las barras se actualizan aunque
          * las entidades estén detenidas temporalmente.
@@ -1237,6 +1508,110 @@ export default class GameScene extends Phaser.Scene {
                 time,
                 delta
             );
+    }
+
+    // =========================================================
+    // Enemigos
+    // =========================================================
+
+    /*
+     * Todos los enemigos, vengan de las oleadas o de los tejados.
+     * Lo usan los shuriken del jugador.
+     */
+    getAllEnemies() {
+        const oleadas =
+            this.enemyManager
+                ?.getEnemies?.() ?? [];
+
+        const tejados =
+            this.roofEnemyManager
+                ?.getEnemies?.() ?? [];
+
+        if (tejados.length === 0) {
+            return oleadas;
+        }
+
+        return oleadas.concat(tejados);
+    }
+
+    /*
+     * El jugador, adaptado a la interfaz que espera ShurikenSystem,
+     * para que los shuriken enemigos puedan danarlo.
+     */
+    getPlayerAsTarget() {
+        if (!this.playerAsTarget) {
+            this.playerAsTarget = [{
+                isAlive:
+                    () =>
+                        Boolean(this.player) &&
+                        !this.player.hasDied?.(),
+
+                getSprite:
+                    () =>
+                        this.player
+                            ?.getSprite?.() ?? null,
+
+                takeDamage:
+                    (amount, originX) =>
+                        this.player
+                            ?.takeDamage?.(
+                                amount,
+                                originX
+                            ) ?? false
+            }];
+        }
+
+        return this.playerAsTarget;
+    }
+
+    // =========================================================
+    // Permanencia en camara
+    // =========================================================
+
+    /*
+     * Mata al jugador si se sale del encuadre.
+     *
+     * Se usa die() y no takeDamage() a proposito: takeDamage se ignora
+     * mientras el jugador es invulnerable (justo despues de un golpe),
+     * y salirse de la pantalla tiene que matar siempre.
+     */
+    enforceCameraBounds() {
+        const sprite =
+            this.player?.getSprite?.();
+
+        const body = sprite?.body;
+
+        if (
+            !sprite?.active ||
+            !body ||
+            !body.width
+        ) {
+            return;
+        }
+
+        const screenWidth =
+            Math.max(1, this.currentWidth);
+
+        if (
+            !isOutOfCamera(
+                body.left,
+                body.right,
+                screenWidth
+            )
+        ) {
+            return;
+        }
+
+        console.log(
+            "[GameScene] El jugador salió de cámara:",
+            {
+                left: Math.round(body.left),
+                right: Math.round(body.right),
+                screenWidth
+            }
+        );
+
+        this.player.die();
     }
 
     // =========================================================
@@ -1433,6 +1808,9 @@ export default class GameScene extends Phaser.Scene {
         );
 
         this.backgroundManager
+            ?.resize?.();
+
+        this.hangingPropManager
             ?.resize?.();
 
         if (
@@ -1763,6 +2141,39 @@ export default class GameScene extends Phaser.Scene {
             ?.destroy();
 
         this.obstacleManager =
+            null;
+
+        this.grappleController
+            ?.destroy();
+
+        this.grappleController =
+            null;
+
+        this.shurikenSystem
+            ?.destroy();
+
+        this.shurikenSystem =
+            null;
+
+        this.enemyShurikenSystem
+            ?.destroy();
+
+        this.enemyShurikenSystem =
+            null;
+
+        this.roofEnemyManager
+            ?.destroy();
+
+        this.roofEnemyManager =
+            null;
+
+        this.hookRegistry =
+            null;
+
+        this.hangingPropManager
+            ?.destroy();
+
+        this.hangingPropManager =
             null;
 
         this.backgroundManager

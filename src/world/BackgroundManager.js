@@ -130,6 +130,13 @@ export default class BackgroundManager {
          */
         this.sequenceIndex = 0;
 
+        /*
+         * Contador para dar a cada panel una identidad estable. Otros
+         * sistemas cuelgan cosas de un panel concreto y necesitan
+         * saber si sigue siendo el mismo o ya se reciclo.
+         */
+        this.panelSerial = 0;
+
         this.isDestroyed = false;
     }
 
@@ -430,8 +437,12 @@ export default class BackgroundManager {
             body,
             segments,
             textureIndex,
-            centerY
+            centerY,
+
+            serial: this.panelSerial
         };
+
+        this.panelSerial += 1;
 
         this.applyPanelTexture(panel);
 
@@ -654,6 +665,14 @@ export default class BackgroundManager {
 
         this.sequenceIndex += 1;
 
+        /*
+         * Al reciclarse deja de ser el mismo panel: lo que colgara de
+         * el es otra cosa, aunque reutilice los mismos objetos.
+         */
+        panel.serial = this.panelSerial;
+
+        this.panelSerial += 1;
+
         this.applyPanelTexture(panel);
 
         /*
@@ -736,6 +755,74 @@ export default class BackgroundManager {
                 segment.x = x;
             }
         }
+    }
+
+    // =========================================================
+    // Consultas
+    // =========================================================
+
+    /*
+     * Posición en pantalla de cada panel visible, para que otros
+     * sistemas puedan colgar cosas del propio dibujo del fondo.
+     *
+     * Devuelve, por panel, la textura que tiene puesta ahora mismo y
+     * lo necesario para convertir un punto del PNG original en un
+     * punto de la pantalla:
+     *
+     *     pantallaX = x  + origenX * scaleX
+     *     pantallaY = topY + origenY * scaleY
+     *
+     * Así un objeto anclado a una rama sigue al fondo sin lógica de
+     * desplazamiento propia: aparece y desaparece exactamente con el
+     * panel del que cuelga.
+     */
+    getPanelPlacements() {
+        const placements = [];
+
+        if (
+            this.isDestroyed ||
+            this.tileWidth <= 0
+        ) {
+            return placements;
+        }
+
+        for (const panel of this.panels) {
+            const key =
+                this.textureKeys[
+                    panel.textureIndex
+                ];
+
+            const size =
+                this.getTextureSize(key);
+
+            if (!size) {
+                continue;
+            }
+
+            placements.push({
+                key,
+
+                serial: panel.serial,
+
+                x: panel.body.x,
+
+                scaleX:
+                    this.tileWidth /
+                    size.width,
+
+                scaleY:
+                    this.backgroundScale,
+
+                topY:
+                    panel.centerY -
+                    (
+                        (size.height / 2) *
+                        this.backgroundScale
+                    )
+            });
+        }
+
+        return placements;
     }
 
     // =========================================================
