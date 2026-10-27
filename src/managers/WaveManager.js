@@ -244,6 +244,49 @@ export default class WaveManager {
         this.pendingSpawns =
             0;
 
+        /*
+         * Momento en que empezo la tanda de apariciones. Lo usa el
+         * vigilante que desbloquea una generacion colgada.
+         */
+        this.spawningStartedAt =
+            null;
+
+        /*
+         * Holgura que se da al vigilante por encima de lo que deberia
+         * tardar la tanda, para no desbloquear de mas.
+         */
+        this.spawnWatchdogMargin =
+            Math.max(
+                1000,
+                this.getNonNegativeNumber(
+                    configuration.spawnWatchdogMargin,
+                    4000
+                )
+            );
+
+        /*
+         * Avisos para la interfaz: entra una ronda, o se acaban.
+         */
+        this.onWaveStart =
+            configuration.onWaveStart ??
+            null;
+
+        this.onAllWavesFinished =
+            configuration.onAllWavesFinished ??
+            null;
+
+        /*
+         * Cantidad de enemigos por ronda, en orden.
+         *
+         * Se da explicita en vez de con una formula para poder
+         * ajustar la curva de dificultad a mano, que es lo que acaba
+         * haciendo falta al probar el juego.
+         */
+        this.enemiesPerWave =
+            Array.isArray(configuration.enemiesPerWave)
+                ? configuration.enemiesPerWave.slice()
+                : null;
+
         this.isRunning =
             false;
 
@@ -379,7 +422,14 @@ export default class WaveManager {
         if (
             this.isDestroyed ||
             !this.isRunning ||
-            this.hasFinished ||
+            this.hasFinished
+        ) {
+            return;
+        }
+
+        this.releaseStuckSpawning();
+
+        if (
             this.isSpawning ||
             this.waitingForNextWave
         ) {
@@ -408,6 +458,53 @@ export default class WaveManager {
                 this.delayBetweenWaves
             );
         }
+    }
+
+    /*
+     * Red de seguridad contra una generacion colgada.
+     *
+     * Si isSpawning se queda en true, no vuelve a empezar ninguna
+     * oleada y la partida se queda sin enemigos. Aqui se comprueba
+     * que no lleve mas tiempo del que puede durar razonablemente una
+     * tanda de apariciones, y si lo lleva se desbloquea.
+     */
+    releaseStuckSpawning() {
+        if (!this.isSpawning) {
+            this.spawningStartedAt = null;
+
+            return;
+        }
+
+        const now =
+            this.scene?.time?.now ?? 0;
+
+        if (this.spawningStartedAt === null) {
+            this.spawningStartedAt = now;
+
+            return;
+        }
+
+        const limit =
+            (
+                this.totalEnemiesInCurrentWave *
+                this.spawnInterval
+            ) +
+            this.spawnWatchdogMargin;
+
+        if (now - this.spawningStartedAt < limit) {
+            return;
+        }
+
+        console.warn(
+            "[WaveManager] " +
+            "La generacion de la oleada " +
+            this.currentWave +
+            " se quedo colgada. Se desbloquea."
+        );
+
+        this.pendingSpawns = 0;
+        this.isSpawning = false;
+        this.spawningStartedAt = null;
     }
 
     // =========================================================
@@ -472,6 +569,14 @@ export default class WaveManager {
         this.isSpawning =
             true;
 
+        this.spawningStartedAt =
+            this.scene?.time?.now ?? 0;
+
+        this.onWaveStart?.(
+            this.currentWave,
+            this.totalEnemiesInCurrentWave
+        );
+
         for (
             let index = 0;
             index <
@@ -497,6 +602,22 @@ export default class WaveManager {
     calculateEnemyCount(
         waveNumber
     ) {
+        if (this.enemiesPerWave) {
+            const index =
+                Phaser.Math.Clamp(
+                    Math.floor(waveNumber) - 1,
+                    0,
+                    this.enemiesPerWave.length - 1
+                );
+
+            return Math.max(
+                1,
+                Math.floor(
+                    this.enemiesPerWave[index]
+                )
+            );
+        }
+
         const calculated =
             this.initialEnemyCount +
             (
@@ -544,7 +665,29 @@ export default class WaveManager {
                         return;
                     }
 
-                    this.spawnEnemy();
+                    /*
+                     * El spawn va protegido a proposito.
+                     *
+                     * Si reventaba, las lineas de abajo no llegaban a
+                     * ejecutarse: pendingSpawns se quedaba por encima
+                     * de cero e isSpawning en true para siempre, y
+                     * update() salia por su primera guarda. Resultado:
+                     * tras matar a los enemigos de esa oleada no
+                     * volvia a aparecer ninguno nunca mas.
+                     *
+                     * La contabilidad tiene que avanzar pase lo que
+                     * pase; que falle un enemigo es un problema de ese
+                     * enemigo, no de la partida entera.
+                     */
+                    try {
+                        this.spawnEnemy();
+                    } catch (error) {
+                        console.error(
+                            "[WaveManager] " +
+                            "Fallo al generar un enemigo:",
+                            error
+                        );
+                    }
 
                     this.pendingSpawns =
                         Math.max(
@@ -1024,6 +1167,10 @@ export default class WaveManager {
             false;
 
         this.clearTimers();
+
+        this.onAllWavesFinished?.(
+            this.currentWave
+        );
 
         console.log(
             `[WaveManager] Finalizaron ` +

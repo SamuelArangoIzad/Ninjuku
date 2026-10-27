@@ -60,11 +60,26 @@ const BRANCH_ANCHORS = {
     ],
 
     /*
-     * fondo6 y fondo7 son cielo despejado, sin cerezo.
+     * fondo6 y fondo7 no tienen cerezo: son los dos unicos del ciclo
+     * sin rama en flor. Dejarlos vacios abria un tramo de mas de un
+     * minuto sin un solo colgante en pantalla, y durante ese tramo el
+     * corazon y el x2 no tenian donde ponerse y desaparecian.
+     *
+     * La plataforma flota, asi que aqui no se cuelga de una rama sino
+     * que se posa sobre la linea de arbolado. Las dos de cada fondo
+     * van separadas a proposito: pegadas al borde, la de la derecha
+     * de fondo6 y la de la izquierda de fondo7 quedaban a 210 px y se
+     * solapaban al pasar de un panel al siguiente.
      */
-    "background-6": [],
+    "background-6": [
+        { x: 300, y: 300 },
+        { x: 1100, y: 255 }
+    ],
 
-    "background-7": [],
+    "background-7": [
+        { x: 300, y: 330 },
+        { x: 1100, y: 265 }
+    ],
 
     "background-8": [
         { x: 1196, y: 224 }

@@ -42,6 +42,16 @@ import RoofEnemyManager
 import HookRegistry
     from "../world/HookRegistry.js";
 
+
+import RoundBanner
+    from "../ui/RoundBanner.js";
+
+import DamageBoost
+    from "../systems/DamageBoost.js";
+
+import SwingPickup
+    from "../world/SwingPickup.js";
+
 import { isOutOfCamera }
     from "../systems/CameraBounds.js";
 
@@ -79,6 +89,71 @@ const BACKGROUND_KEYS = [
  * obstaculo. Igual que los fondos, la secuencia se repite en bucle.
  * Se alternan bajas y altas para que el ritmo de saltos varie.
  */
+/*
+ * Rondas y cuantos enemigos de suelo trae cada una.
+ *
+ * Se da como tabla explicita, no con una formula, porque la dificultad
+ * real no depende solo del numero de enemigos: tambien suben de vida
+ * cada tres rondas, va apareciendo mas samurai, y a partir de la
+ * tercera el jugador puede llevar el multiplicador x2.
+ *
+ * Con las cinco rondas anteriores la cuenta no cuadraba. Midiendo el
+ * esfuerzo como (enemigos x golpes necesarios para matar a cada uno),
+ * en la ronda 3 BAJABA un 6%: entraba el x2 y la dificultad retrocedia
+ * justo cuando el jugador se hacia mas fuerte. De ahi que se pasaran
+ * sin problema.
+ *
+ * Esta tabla sale de resolver para un crecimiento del 20% por ronda
+ * teniendo en cuenta los tres factores:
+ *
+ *   ronda    1   2   3   4   5   6   7   8   9  10
+ *   enem     3   5   9  10  12  14  14  17  20  24
+ *   x2       -   -  si  si  si  si  si  si  si  si
+ *   esfuerzo 9  18  21  25  31  37  51  62  73  88
+ *   variacion   +94 +21 +16 +25 +21 +38 +21 +18 +20
+ *
+ * Ya no hay ninguna ronda en la que la dificultad baje, y la decima
+ * cuesta casi diez veces lo que la primera.
+ *
+ * La ronda 7 se queda plana en numero de enemigos a proposito: es una
+ * de las rondas en las que sube la vida, y el escalon lo aporta eso en
+ * vez de meter mas cuerpos en pantalla.
+ */
+const TOTAL_ROUNDS = 10;
+
+const ENEMIES_PER_ROUND = [3, 5, 9, 10, 12, 14, 14, 17, 20, 24];
+
+/*
+ * Lanzadores de tejado permitidos en cada ronda.
+ *
+ * En la primera no hay ninguno: el jugador todavia esta aprendiendo a
+ * colgarse del kusarigama. El tope es cuatro porque solo hay cuatro
+ * casas altas en cada vuelta del escenario (torre, portico, casa sobre
+ * pilotes y pagoda), asi que pedir mas no pondria ninguno adicional.
+ */
+const ROOF_ENEMIES_PER_ROUND = [0, 1, 2, 2, 3, 3, 4, 4, 4, 4];
+
+/*
+ * Ronda a partir de la cual aparece el multiplicador de dano.
+ */
+const BOOST_FROM_ROUND = 3;
+
+/*
+ * Ronda a partir de la cual aparece el corazon de vida.
+ */
+const HEART_FROM_ROUND = 2;
+
+/*
+ * Cuanta vida devuelve, como fraccion del maximo.
+ *
+ * El jugador tiene 5 de vida, asi que el 25% son 1.25 puntos.
+ * La vida es entera, de modo que se redondea a 1: una quinta
+ * parte de la barra. No se puede dar un cuarto exacto sin
+ * cambiar la escala de vida del jugador.
+ */
+const HEART_FRACTION = 0.25;
+
+
 const OBSTACLE_KEYS = [
     "obstacle-3",
     "obstacle-1",
@@ -122,6 +197,25 @@ export default class GameScene extends Phaser.Scene {
 
         this.hookRegistry =
             null;
+
+        this.roundBanner =
+            null;
+
+        this.damageBoost =
+            null;
+
+        this.damageBoostPickup =
+            null;
+
+        this.healthPickup =
+            null;
+
+        /*
+         * Ronda en la que ya se cogio el corazon. Hay uno por ronda,
+         * asi que en la siguiente vuelve a aparecer.
+         */
+        this.heartTakenInRound =
+            0;
 
         // =====================================================
         // Jugador y controles
@@ -1064,7 +1158,12 @@ export default class GameScene extends Phaser.Scene {
                 {
                     getEnemies:
                         () =>
-                            this.getAllEnemies()
+                            this.getAllEnemies(),
+
+                    getDamageMultiplier:
+                        () =>
+                            this.damageBoost
+                                ?.getMultiplier?.() ?? 1
                 }
             );
 
@@ -1108,7 +1207,15 @@ export default class GameScene extends Phaser.Scene {
                         () =>
                             this.player
                                 ?.getSprite?.() ??
-                            null
+                            null,
+
+                    getRound:
+                        () =>
+                            this.waveManager
+                                ?.getCurrentWave?.() ?? 1,
+
+                    enemiesPerRound:
+                        ROOF_ENEMIES_PER_ROUND
                 }
             );
 
@@ -1123,6 +1230,135 @@ export default class GameScene extends Phaser.Scene {
                 this.hangingPropManager,
                 this.roofEnemyManager
             ]);
+
+        // =====================================================
+        // Multiplicador de dano
+        // =====================================================
+
+        this.damageBoost =
+            new DamageBoost(this);
+
+        this.damageBoost.create();
+
+        const spritePlayer =
+            () =>
+                this.player
+                    ?.getSprite?.() ?? null;
+
+        const rondaActual =
+            () =>
+                this.waveManager
+                    ?.getCurrentWave?.() ?? 1;
+
+        this.damageBoostPickup =
+            new SwingPickup(
+                this,
+                {
+                    hookSource:
+                        this.hookRegistry,
+
+                    getPlayerSprite:
+                        spritePlayer,
+
+                    getRound:
+                        rondaActual,
+
+                    availableFromRound:
+                        BOOST_FROM_ROUND,
+
+                    label: "x2",
+
+                    /*
+                     * El x2 se queda con el lado izquierdo del arco.
+                     */
+                    arcSide: -1,
+
+                    /*
+                     * Si tiene que cambiarse de lado, no se mete en
+                     * el del corazon.
+                     */
+                    avoidHookId:
+                        () =>
+                            this.healthPickup
+                                ?.getHookId?.() ??
+                            null,
+
+                    isSpent:
+                        () =>
+                            Boolean(
+                                this.damageBoost
+                                    ?.isActive?.()
+                            ),
+
+                    onCollect:
+                        () =>
+                            Boolean(
+                                this.damageBoost
+                                    ?.activate?.()
+                            )
+                }
+            );
+
+        this.damageBoostPickup.create();
+
+        this.healthPickup =
+            new SwingPickup(
+                this,
+                {
+                    hookSource:
+                        this.hookRegistry,
+
+                    getPlayerSprite:
+                        spritePlayer,
+
+                    getRound:
+                        rondaActual,
+
+                    availableFromRound:
+                        HEART_FROM_ROUND,
+
+                    label: "♥",
+
+                    color: "#ff5f6d",
+
+                    fontSize: "40px",
+
+                    /*
+                     * El corazon ocupa el lado derecho del arco, el
+                     * contrario al del x2: si les toca compartir
+                     * colgante, siguen sin pisarse.
+                     */
+                    arcSide: 1,
+
+                    /*
+                     * Aun asi prefiere un colgante libre.
+                     */
+                    avoidHookId:
+                        () =>
+                            this.damageBoostPickup
+                                ?.getHookId?.() ??
+                            null,
+
+                    isSpent:
+                        () =>
+                            this.heartTakenInRound ===
+                            rondaActual(),
+
+                    /*
+                     * A vida llena no se deja coger: asi no se
+                     * desperdicia y espera a que haga falta.
+                     */
+                    canCollect:
+                        () =>
+                            this.isPlayerHurt(),
+
+                    onCollect:
+                        () =>
+                            this.healPlayer()
+                }
+            );
+
+        this.healthPickup.create();
 
         this.grappleController =
             new GrappleController(
@@ -1155,7 +1391,12 @@ export default class GameScene extends Phaser.Scene {
                         () =>
                             this.roofEnemyManager
                                 ?.getEnemies?.() ??
-                            []
+                            [],
+
+                    getDamageMultiplier:
+                        () =>
+                            this.damageBoost
+                                ?.getMultiplier?.() ?? 1
                 }
             );
 
@@ -1175,7 +1416,13 @@ export default class GameScene extends Phaser.Scene {
 
         this.scoreSystem =
             new ScoreSystem(
-                this
+                this,
+                {
+                    getScoreMultiplier:
+                        () =>
+                            this.damageBoost
+                                ?.getMultiplier?.() ?? 1
+                }
             );
 
         this.performanceMonitor =
@@ -1210,9 +1457,33 @@ export default class GameScene extends Phaser.Scene {
                 this,
                 {
                     enemyManager:
-                        this.enemyManager
+                        this.enemyManager,
+
+                    maximumWaves:
+                        TOTAL_ROUNDS,
+
+                    enemiesPerWave:
+                        ENEMIES_PER_ROUND,
+
+                    onWaveStart:
+                        (number, enemies) =>
+                            this.roundBanner
+                                ?.showRound(
+                                    number,
+                                    enemies
+                                ),
+
+                    onAllWavesFinished:
+                        (rounds) =>
+                            this.roundBanner
+                                ?.showFinished(rounds)
                 }
             );
+
+        this.roundBanner =
+            new RoundBanner(this);
+
+        this.roundBanner.create();
 
         const wavesStarted =
             this.waveManager.start();
@@ -1450,6 +1721,12 @@ export default class GameScene extends Phaser.Scene {
         this.enemyShurikenSystem
             ?.update(delta);
 
+        this.damageBoostPickup
+            ?.update(delta);
+
+        this.healthPickup
+            ?.update(delta);
+
         if (
             playerIsAlive &&
             this.controls &&
@@ -1538,6 +1815,57 @@ export default class GameScene extends Phaser.Scene {
      * El jugador, adaptado a la interfaz que espera ShurikenSystem,
      * para que los shuriken enemigos puedan danarlo.
      */
+    /*
+     * Le falta vida al jugador?
+     */
+    isPlayerHurt() {
+        const salud =
+            this.player
+                ?.getHealthComponent?.();
+
+        if (!salud) {
+            return false;
+        }
+
+        return (
+            salud.getCurrentHealth() <
+            salud.getMaximumHealth()
+        );
+    }
+
+    /*
+     * Devuelve parte de la vida. La barra sube sola, porque el
+     * sistema que la dibuja lee el componente cada fotograma.
+     */
+    healPlayer() {
+        const salud =
+            this.player
+                ?.getHealthComponent?.();
+
+        if (!salud) {
+            return false;
+        }
+
+        const cantidad =
+            Math.max(
+                1,
+                Math.round(
+                    salud.getMaximumHealth() *
+                    HEART_FRACTION
+                )
+            );
+
+        if (!salud.heal(cantidad)) {
+            return false;
+        }
+
+        this.heartTakenInRound =
+            this.waveManager
+                ?.getCurrentWave?.() ?? 1;
+
+        return true;
+    }
+
     getPlayerAsTarget() {
         if (!this.playerAsTarget) {
             this.playerAsTarget = [{
@@ -1868,6 +2196,12 @@ export default class GameScene extends Phaser.Scene {
                 resizeData
             );
 
+        this.roundBanner
+            ?.handleResize?.();
+
+        this.damageBoost
+            ?.handleResize?.();
+
         console.log(
             "[GameScene] Resize aplicado:",
             {
@@ -2168,6 +2502,30 @@ export default class GameScene extends Phaser.Scene {
             null;
 
         this.hookRegistry =
+            null;
+
+        this.roundBanner
+            ?.destroy();
+
+        this.roundBanner =
+            null;
+
+        this.damageBoostPickup
+            ?.destroy();
+
+        this.damageBoostPickup =
+            null;
+
+        this.healthPickup
+            ?.destroy();
+
+        this.healthPickup =
+            null;
+
+        this.damageBoost
+            ?.destroy();
+
+        this.damageBoost =
             null;
 
         this.hangingPropManager

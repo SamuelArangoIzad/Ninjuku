@@ -37,6 +37,14 @@ export default class CombatSystem {
             (() => []);
 
         /*
+         * Multiplicador de dano del jugador. Solo afecta a los golpes
+         * que da el, nunca a los que recibe.
+         */
+        this.getDamageMultiplier =
+            configuration.getDamageMultiplier ??
+            (() => 1);
+
+        /*
          * Lista reutilizable, para no reservar memoria cada golpe.
          */
         this.damageableBuffer = [];
@@ -326,9 +334,19 @@ export default class CombatSystem {
                 continue;
             }
 
+            const damage =
+                Math.max(
+                    1,
+                    Math.round(
+                        Number(
+                            this.getDamageMultiplier()
+                        ) || 1
+                    )
+                );
+
             const applied =
                 enemy.takeDamage?.(
-                    1,
+                    damage,
                     attackerX
                 );
 

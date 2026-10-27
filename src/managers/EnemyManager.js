@@ -76,6 +76,48 @@ export default class EnemyManager {
             enemySettings.cullingEnabled ??
             true;
 
+        /*
+         * Cuanto puede estar un enemigo fuera del area activa antes
+         * de retirarlo, en milisegundos.
+         *
+         * Hace falta porque descartarlo solo le apaga la IA: se queda
+         * congelado pero SIGUE CONTANDO COMO VIVO. Si uno se pierde
+         * fuera de la pantalla (empujado por una casa, por ejemplo),
+         * la oleada no puede darse por terminada y la partida se
+         * queda bloqueada en esa ronda para siempre.
+         */
+        /*
+         * Enemigos extraviados que hay que retirar. No se liberan
+         * dentro del recorrido: releaseEnemy hace splice sobre el
+         * mismo arreglo que se esta iterando con for...of, y eso se
+         * saltaria al siguiente de la lista.
+         */
+        this.pendingStrayRemovals = [];
+
+        /*
+         * Cuanto puede tardar un enemigo en terminar de entrar antes
+         * de darlo por perdido, en milisegundos.
+         *
+         * Una entrada normal son 115 px a 70-155 px/s: menos de dos
+         * segundos. Seis da margen de sobra y solo salta cuando de
+         * verdad se ha quedado atascado.
+         */
+        this.enteringTimeout =
+            Math.max(
+                1000,
+                Number(
+                    configuration.enteringTimeout
+                ) || 6000
+            );
+
+        this.strayTimeout =
+            Math.max(
+                500,
+                Number(
+                    configuration.strayTimeout
+                ) || 3000
+            );
+
         this.activeAreaMargin =
             this.normalizeNonNegativeNumber(
                 configuration.activeAreaMargin ??
@@ -767,6 +809,11 @@ export default class EnemyManager {
              * La entrada tiene prioridad sobre el culling.
              */
             if (isEntering) {
+                this.handleStuckEntry(
+                    enemy,
+                    time
+                );
+
                 this.updateEnteringEnemy(
                     enemy,
                     time
@@ -785,8 +832,23 @@ export default class EnemyManager {
                     enemy
                 );
 
+                this.handleStrayEnemy(
+                    enemy,
+                    time
+                );
+
                 continue;
             }
+
+            /*
+             * Ha vuelto al area y ya entro: se olvidan los dos
+             * contadores de atasco.
+             */
+            enemy.outsideSince =
+                null;
+
+            enemy.enteringSince =
+                null;
 
             this.restoreNormalPhysics(
                 enemy
@@ -800,6 +862,39 @@ export default class EnemyManager {
                 time
             );
         }
+
+        this.releaseStrayEnemies();
+    }
+
+    /*
+     * Retira los extraviados ya fuera del recorrido, cuando modificar
+     * el arreglo es seguro.
+     */
+    queueStrayRemoval(enemy) {
+        if (
+            !this.pendingStrayRemovals
+                .includes(enemy)
+        ) {
+            this.pendingStrayRemovals
+                .push(enemy);
+        }
+    }
+
+    releaseStrayEnemies() {
+        if (
+            this.pendingStrayRemovals.length === 0
+        ) {
+            return;
+        }
+
+        for (
+            const enemy
+            of this.pendingStrayRemovals
+        ) {
+            this.releaseEnemy(enemy);
+        }
+
+        this.pendingStrayRemovals.length = 0;
     }
 
     updateEnteringEnemy(
@@ -847,6 +942,22 @@ export default class EnemyManager {
                 );
 
         if (isOutside) {
+            /*
+             * Fuera de la pantalla no choca con nada.
+             *
+             * Si no, una casa que pase por el borde le corta el paso
+             * y no entra jamas. Y no puede saltarla: entrando tiene
+             * la gravedad apagada y la "y" fijada, asi que su cuerpo
+             * nunca esta apoyado y el salto asistido de los
+             * obstaculos no se dispara. Se quedaba empotrado, vivo y
+             * exento del descarte por distancia, bloqueando el fin de
+             * la ronda para siempre.
+             */
+            if (sprite.body.checkCollision) {
+                sprite.body.checkCollision.none =
+                    true;
+            }
+
             if (
                 sprite.body.allowGravity
             ) {
@@ -867,6 +978,10 @@ export default class EnemyManager {
                 this.getGroundSurfaceY() -
                 5;
         } else {
+            /*
+             * Ya asoma dentro: restoreNormalPhysics le devuelve la
+             * gravedad y las colisiones.
+             */
             this.restoreNormalPhysics(
                 enemy
             );
@@ -888,6 +1003,22 @@ export default class EnemyManager {
 
         if (!sprite?.body) {
             return false;
+        }
+
+        /*
+         * Mientras entra desde fuera se le desactivan las colisiones
+         * para que nada le corte el paso. Se devuelven aqui, que es
+         * por donde pasa todo enemigo que ya esta en juego: si solo
+         * se restauraran en la rama de entrada, uno que terminase de
+         * entrar estando aun fuera se quedaria atravesando el
+         * escenario y el suelo para siempre.
+         */
+        if (
+            sprite.body.checkCollision &&
+            sprite.body.checkCollision.none
+        ) {
+            sprite.body.checkCollision.none =
+                false;
         }
 
         if (
@@ -956,6 +1087,95 @@ export default class EnemyManager {
                 bottom +
                 this.activeAreaMargin
         );
+    }
+
+    /*
+     * Retira a un enemigo que lleva demasiado tiempo fuera del area
+     * activa.
+     *
+     * Un enemigo perdido fuera de pantalla no puede alcanzar al
+     * jugador ni ser alcanzado, pero seguia contando como vivo y
+     * bloqueaba el fin de la oleada. Se le da un margen por si vuelve
+     * a entrar y, si no, se libera como si se hubiera retirado del
+     * combate: sin animacion de muerte y sin puntuar.
+     */
+    /*
+     * Red de seguridad para una entrada que no termina.
+     *
+     * La entrada tiene prioridad sobre el descarte por distancia, asi
+     * que un enemigo atascado entrando no lo retira nadie y mantiene
+     * la ronda abierta indefinidamente.
+     */
+    handleStuckEntry(enemy, time) {
+        if (!enemy?.isAlive?.()) {
+            return false;
+        }
+
+        const now =
+            Number.isFinite(time)
+                ? time
+                : (this.scene?.time?.now ?? 0);
+
+        if (!enemy.enteringSince) {
+            enemy.enteringSince = now;
+
+            return false;
+        }
+
+        if (
+            now - enemy.enteringSince <
+            this.enteringTimeout
+        ) {
+            return false;
+        }
+
+        console.warn(
+            "[EnemyManager] " +
+            "Enemigo atascado entrando: se retira " +
+            "para no bloquear la ronda."
+        );
+
+        enemy.enteringSince = null;
+
+        this.queueStrayRemoval(enemy);
+
+        return true;
+    }
+
+    handleStrayEnemy(enemy, time) {
+        if (!enemy?.isAlive?.()) {
+            return false;
+        }
+
+        const now =
+            Number.isFinite(time)
+                ? time
+                : (this.scene?.time?.now ?? 0);
+
+        if (!enemy.outsideSince) {
+            enemy.outsideSince = now;
+
+            return false;
+        }
+
+        if (
+            now - enemy.outsideSince <
+            this.strayTimeout
+        ) {
+            return false;
+        }
+
+        console.warn(
+            "[EnemyManager] " +
+            "Enemigo perdido fuera de pantalla: se retira " +
+            "para no bloquear la oleada."
+        );
+
+        enemy.outsideSince = null;
+
+        this.queueStrayRemoval(enemy);
+
+        return true;
     }
 
     deactivateEnemyAI(enemy) {

@@ -6,7 +6,15 @@ import ScoreHUD
 
 
 export default class ScoreSystem {
-    constructor(scene) {
+    constructor(scene, configuration = {}) {
+        /*
+         * Mismo multiplicador que el dano: si el jugador lleva el x2,
+         * tambien puntua el doble.
+         */
+        this.getScoreMultiplier =
+            configuration.getScoreMultiplier ??
+            (() => 1);
+
         this.scene =
             scene ?? null;
 
@@ -45,13 +53,24 @@ export default class ScoreSystem {
             return;
         }
 
-        const points =
+        const base =
             Math.max(
                 0,
                 Math.floor(
                     Number(
                         data.points
                     ) || 0
+                )
+            );
+
+        const points =
+            Math.floor(
+                base *
+                Math.max(
+                    1,
+                    Number(
+                        this.getScoreMultiplier()
+                    ) || 1
                 )
             );
 

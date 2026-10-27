@@ -183,6 +183,26 @@ export default class RoofEnemyManager {
             configuration.healthBarSystem ??
             null;
 
+        /*
+         * Ronda en curso. Con ella se decide cuantos lanzadores puede
+         * haber a la vez.
+         */
+        this.getRound =
+            configuration.getRound ??
+            (() => 1);
+
+        /*
+         * Cuantos lanzadores como maximo en cada ronda.
+         *
+         * En la primera no hay ninguno: el jugador todavia esta
+         * aprendiendo a colgarse. A partir de ahi suben de uno en uno.
+         */
+        this.enemiesPerRound =
+            Array.isArray(configuration.enemiesPerRound) &&
+            configuration.enemiesPerRound.length > 0
+                ? configuration.enemiesPerRound.slice()
+                : [0, 1, 2, 3, 4];
+
         this.roofKeys =
             Array.isArray(configuration.roofKeys) &&
             configuration.roofKeys.length > 0
@@ -491,13 +511,23 @@ export default class RoofEnemyManager {
 
         const scale = this.getScale();
 
+        const allowed = this.getMaxActive();
+
         for (
             let index = 0;
             index < this.enemies.length;
             index += 1
         ) {
             const enemy = this.enemies[index];
-            const roof = roofs[index] ?? null;
+
+            /*
+             * Solo se ocupan tantos tejados como permita la ronda. El
+             * resto de casas pasan vacias.
+             */
+            const roof =
+                index < allowed
+                    ? (roofs[index] ?? null)
+                    : null;
 
             if (!roof) {
                 this.park(enemy);
@@ -840,6 +870,32 @@ export default class RoofEnemyManager {
                     .addEnemy?.(enemy);
             }
         }
+    }
+
+    /*
+     * Cuantos lanzadores admite la ronda en curso.
+     */
+    getMaxActive() {
+        const round =
+            Math.max(
+                1,
+                Math.floor(
+                    Number(this.getRound()) || 1
+                )
+            );
+
+        const index =
+            Math.min(
+                round - 1,
+                this.enemiesPerRound.length - 1
+            );
+
+        return Math.max(
+            0,
+            Math.floor(
+                this.enemiesPerRound[index]
+            )
+        );
     }
 
     getEnemies() {

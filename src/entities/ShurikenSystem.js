@@ -80,6 +80,14 @@ export default class ShurikenSystem {
             1;
 
         /*
+         * Multiplicador externo. Lo usa el del jugador; el de los
+         * enemigos se queda con el valor por defecto.
+         */
+        this.getDamageMultiplier =
+            configuration.getDamageMultiplier ??
+            (() => 1);
+
+        /*
          * Cuantos pueden volar a la vez.
          */
         this.poolSize =
@@ -319,7 +327,18 @@ export default class ShurikenSystem {
             }
 
             enemy.takeDamage?.(
-                this.damage,
+                Math.max(
+                    1,
+                    Math.round(
+                        this.damage *
+                        (
+                            Number(
+                                this.getDamageMultiplier()
+                            ) || 1
+                        )
+                    )
+                ),
+
                 shuriken.x
             );
 
