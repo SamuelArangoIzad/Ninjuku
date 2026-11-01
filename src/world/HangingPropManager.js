@@ -65,20 +65,25 @@ const BRANCH_ANCHORS = {
      * minuto sin un solo colgante en pantalla, y durante ese tramo el
      * corazon y el x2 no tenian donde ponerse y desaparecian.
      *
-     * La plataforma flota, asi que aqui no se cuelga de una rama sino
-     * que se posa sobre la linea de arbolado. Las dos de cada fondo
-     * van separadas a proposito: pegadas al borde, la de la derecha
-     * de fondo6 y la de la izquierda de fondo7 quedaban a 210 px y se
-     * solapaban al pasar de un panel al siguiente.
+     * Aqui el tablon cuelga de la copa de los pinos en vez de una
+     * rama de cerezo. Los puntos estan medidos sobre el dibujo: la
+     * argolla del colgante queda 129 px por encima del ancla, asi que
+     * cada uno esta elegido para que esa argolla caiga dentro del
+     * arbol y no suelta en el cielo, como pasa con las ramas en los
+     * demas fondos.
+     *
+     * Estan repartidos ademas para que no queden dos pegados al
+     * cambiar de panel: el mas corto de los saltos entre colgantes
+     * consecutivos de todo el ciclo es de 538 px, y el colgante solo
+     * mide 142 de ancho.
      */
     "background-6": [
-        { x: 300, y: 300 },
-        { x: 1100, y: 255 }
+        { x: 60, y: 311 },
+        { x: 1500, y: 245 }
     ],
 
     "background-7": [
-        { x: 300, y: 330 },
-        { x: 1100, y: 265 }
+        { x: 1440, y: 266 }
     ],
 
     "background-8": [

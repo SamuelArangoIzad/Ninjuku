@@ -42,6 +42,12 @@ import RoofEnemyManager
 import HookRegistry
     from "../world/HookRegistry.js";
 
+import DragonStrike, { DRAGON_ROWS, DUST_FRAMES }
+    from "../entities/DragonStrike.js";
+
+import BackgroundMusic
+    from "../systems/BackgroundMusic.js";
+
 
 import RoundBanner
     from "../ui/RoundBanner.js";
@@ -139,6 +145,16 @@ const ROOF_ENEMIES_PER_ROUND = [0, 1, 2, 2, 3, 3, 4, 4, 4, 4];
 const BOOST_FROM_ROUND = 3;
 
 /*
+ * Ronda del segundo x2. Recogerlo llevando ya el primero deja el dano
+ * en x4; si el jugador se salto el de la ronda 3, este le deja en x2,
+ * que es el unico que lleva.
+ *
+ * Esta en la 5 a proposito: es la ronda justo antes de que aparezca
+ * el dragon, asi que da un empujon para llegar a la 6.
+ */
+const SECOND_BOOST_ROUND = 5;
+
+/*
  * Ronda a partir de la cual aparece el corazon de vida.
  */
 const HEART_FROM_ROUND = 2;
@@ -152,6 +168,13 @@ const HEART_FROM_ROUND = 2;
  * cambiar la escala de vida del jugador.
  */
 const HEART_FRACTION = 0.25;
+
+/*
+ * Rondas en las que aparece el icono del dragon. Son las dos mas
+ * duras de la segunda mitad: la 6, donde entran 14 enemigos de suelo
+ * y 3 de tejado, y la 8, con 17 y 4.
+ */
+const DRAGON_ROUNDS = [6, 8];
 
 
 const OBSTACLE_KEYS = [
@@ -204,18 +227,20 @@ export default class GameScene extends Phaser.Scene {
         this.damageBoost =
             null;
 
+        this.secondBoostPickup =
+            null;
+
         this.damageBoostPickup =
             null;
 
         this.healthPickup =
             null;
 
-        /*
-         * Ronda en la que ya se cogio el corazon. Hay uno por ronda,
-         * asi que en la siguiente vuelve a aparecer.
-         */
-        this.heartTakenInRound =
-            0;
+        this.dragonStrike =
+            null;
+
+        this.dragonPickup =
+            null;
 
         // =====================================================
         // Jugador y controles
@@ -315,6 +340,59 @@ export default class GameScene extends Phaser.Scene {
         this.loadShurikenAssets();
         this.loadPlayerAssets();
         this.loadEnemyAssets();
+        this.loadDragonAssets();
+
+        /*
+         * Normalmente ya viene cargada desde el menu. Se pide aqui
+         * tambien por si se entra directo a la partida.
+         */
+        BackgroundMusic.load(this);
+    }
+
+    // =========================================================
+    // Recursos del dragon
+    // =========================================================
+
+    /*
+     * Las siete carpetas del dragon no son siete animaciones: son
+     * una sola repartida en filas, asi que se cargan todas con el
+     * mismo criterio y DragonStrike las encadena en orden.
+     */
+    loadDragonAssets() {
+        const folder =
+            "/assets/dragon";
+
+        for (
+            let row = 0;
+            row < DRAGON_ROWS.length;
+            row += 1
+        ) {
+            for (
+                let index = 1;
+                index <= DRAGON_ROWS[row];
+                index += 1
+            ) {
+                this.load.image(
+                    `dragon-${row + 1}-${index}`,
+
+                    `${folder}/dragon sprites/` +
+                    `row-${row + 1}/sprite-${index}.png`
+                );
+            }
+        }
+
+        for (
+            let index = 1;
+            index <= DUST_FRAMES;
+            index += 1
+        ) {
+            this.load.image(
+                `dragon-dust-${index}`,
+
+                `${folder}/polvo-generado-dragon/` +
+                `polvo${index}.png`
+            );
+        }
     }
 
     // =========================================================
@@ -969,7 +1047,52 @@ export default class GameScene extends Phaser.Scene {
     // Create
     // =========================================================
 
+    /*
+     * Pone a cero lo que dura solo una partida.
+     *
+     * Tiene que estar aqui y no en el constructor. Phaser crea la
+     * escena una sola vez y la reutiliza: al morir y volver a jugar
+     * se vuelve a llamar a create(), pero al constructor no. Lo que
+     * se inicialice alli se queda con el valor de la partida
+     * anterior para siempre, y eso hacia que los recogibles que ya
+     * se habian cogido una vez no volvieran a salir nunca mas, ni
+     * en las partidas siguientes.
+     */
+    resetRunState() {
+        /*
+         * Cada x2 se recoge una sola vez por partida, y por separado:
+         * que se haya cogido uno no hace desaparecer al otro.
+         */
+        this.firstBoostTaken =
+            false;
+
+        this.secondBoostTaken =
+            false;
+
+        /*
+         * Ronda en la que ya se cogio el corazon. Hay uno por ronda,
+         * asi que en la siguiente vuelve a aparecer.
+         */
+        this.heartTakenInRound =
+            0;
+
+        /*
+         * Ronda en la que ya se llamo al dragon. Hay una llamada por
+         * cada ronda en la que aparece.
+         */
+        this.dragonUsedInRound =
+            0;
+    }
+
     create() {
+        /*
+         * La musica viene sonando desde el menu; esto solo la
+         * reanuda si por lo que sea no estaba en marcha.
+         */
+        BackgroundMusic.start(this);
+
+        this.resetRunState();
+
         this.isShuttingDown =
             false;
 
@@ -1273,33 +1396,69 @@ export default class GameScene extends Phaser.Scene {
                      */
                     arcSide: -1,
 
-                    /*
-                     * Si tiene que cambiarse de lado, no se mete en
-                     * el del corazon.
-                     */
-                    avoidHookId:
-                        () =>
-                            this.healthPickup
-                                ?.getHookId?.() ??
-                            null,
-
                     isSpent:
                         () =>
-                            Boolean(
-                                this.damageBoost
-                                    ?.isActive?.()
-                            ),
+                            this.firstBoostTaken,
 
                     onCollect:
                         () =>
-                            Boolean(
-                                this.damageBoost
-                                    ?.activate?.()
+                            this.takeBoost(
+                                "primero"
                             )
                 }
             );
 
         this.damageBoostPickup.create();
+
+        /*
+         * Segundo x2, solo en la ronda 5. Va al fondo del arco: los
+         * extremos los ocupan el primer x2 y el corazon. No choca con
+         * el dragon porque ese solo sale en la 6 y en la 8, cuando
+         * este ya no esta.
+         */
+        this.secondBoostPickup =
+            new SwingPickup(
+                this,
+                {
+                    hookSource:
+                        this.hookRegistry,
+
+                    getPlayerSprite:
+                        spritePlayer,
+
+                    getRound:
+                        rondaActual,
+
+                    availableRounds:
+                        [SECOND_BOOST_ROUND],
+
+                    label: "x2",
+
+                    arcSide: 0,
+
+                    avoidHooks:
+                        () =>
+                            [
+                                this.damageBoostPickup
+                                    ?.getHookId?.(),
+
+                                this.healthPickup
+                                    ?.getHookId?.()
+                            ],
+
+                    isSpent:
+                        () =>
+                            this.secondBoostTaken,
+
+                    onCollect:
+                        () =>
+                            this.takeBoost(
+                                "segundo"
+                            )
+                }
+            );
+
+        this.secondBoostPickup.create();
 
         this.healthPickup =
             new SwingPickup(
@@ -1331,13 +1490,17 @@ export default class GameScene extends Phaser.Scene {
                     arcSide: 1,
 
                     /*
-                     * Aun asi prefiere un colgante libre.
+                     * Aun asi prefiere un colgante libre. El reparto
+                     * va por orden: el x2 elige primero, el corazon
+                     * lo esquiva y el dragon los esquiva a los dos,
+                     * asi que nunca se persiguen entre ellos.
                      */
-                    avoidHookId:
+                    avoidHooks:
                         () =>
-                            this.damageBoostPickup
-                                ?.getHookId?.() ??
-                            null,
+                            [
+                                this.damageBoostPickup
+                                    ?.getHookId?.()
+                            ],
 
                     isSpent:
                         () =>
@@ -1359,6 +1522,94 @@ export default class GameScene extends Phaser.Scene {
             );
 
         this.healthPickup.create();
+
+        // =====================================================
+        // Ayuda del dragon
+        // =====================================================
+
+        this.dragonStrike =
+            new DragonStrike(
+                this,
+                {
+                    ground:
+                        this.ground,
+
+                    getEnemies:
+                        () =>
+                            this.getAllEnemies()
+                }
+            );
+
+        this.dragonStrike.create();
+
+        /*
+         * El icono se recoge igual que el x2 y el corazon, pero solo
+         * sale en las rondas de DRAGON_ROUNDS. Ocupa el lado
+         * izquierdo del arco y esquiva el colgante del corazon, para
+         * que los tres recogibles nunca se pisen.
+         */
+        this.dragonPickup =
+            new SwingPickup(
+                this,
+                {
+                    hookSource:
+                        this.hookRegistry,
+
+                    getPlayerSprite:
+                        spritePlayer,
+
+                    getRound:
+                        rondaActual,
+
+                    availableRounds:
+                        DRAGON_ROUNDS,
+
+                    /*
+                     * El icono es el propio dragon, no un emoji: asi
+                     * se ve igual en cualquier movil y se entiende de
+                     * un vistazo lo que hace.
+                     */
+                    textureKey: "dragon-3-1",
+
+                    textureScale: 0.6,
+
+                    /*
+                     * El dragon va al fondo del arco: el x2 y el
+                     * corazon ya ocupan los dos extremos.
+                     */
+                    arcSide: 0,
+
+                    avoidHooks:
+                        () =>
+                            [
+                                this.damageBoostPickup
+                                    ?.getHookId?.(),
+
+                                this.healthPickup
+                                    ?.getHookId?.()
+                            ],
+
+                    isSpent:
+                        () =>
+                            this.dragonUsedInRound ===
+                            rondaActual(),
+
+                    /*
+                     * Con el dragon ya cruzando no se deja coger
+                     * otra vez.
+                     */
+                    canCollect:
+                        () =>
+                            !this.dragonStrike
+                                ?.isRunning?.(),
+
+                    onCollect:
+                        () =>
+                            this.callDragon()
+                }
+            );
+
+        this.dragonPickup.create();
 
         this.grappleController =
             new GrappleController(
@@ -1727,6 +1978,15 @@ export default class GameScene extends Phaser.Scene {
         this.healthPickup
             ?.update(delta);
 
+        this.secondBoostPickup
+            ?.update(delta);
+
+        this.dragonPickup
+            ?.update(delta);
+
+        this.dragonStrike
+            ?.update(delta);
+
         if (
             playerIsAlive &&
             this.controls &&
@@ -1860,6 +2120,50 @@ export default class GameScene extends Phaser.Scene {
         }
 
         this.heartTakenInRound =
+            this.waveManager
+                ?.getCurrentWave?.() ?? 1;
+
+        return true;
+    }
+
+    /*
+     * Recoge uno de los dos x2. Cada uno dobla el dano otra vez, asi
+     * que con los dos se llega a x4.
+     *
+     * Solo se da por recogido si el multiplicador sube de verdad: si
+     * ya estuviera al maximo, el icono se queda donde esta en vez de
+     * desaparecer sin efecto.
+     */
+    takeBoost(cual) {
+        if (
+            this.damageBoost
+                ?.activate?.() !== true
+        ) {
+            return false;
+        }
+
+        if (cual === "segundo") {
+            this.secondBoostTaken = true;
+        } else {
+            this.firstBoostTaken = true;
+        }
+
+        return true;
+    }
+
+    /*
+     * Llama al dragon. Se gasta solo si la pasada arranca de verdad,
+     * para que el icono no desaparezca sin que pase nada.
+     */
+    callDragon() {
+        if (
+            this.dragonStrike
+                ?.trigger?.() !== true
+        ) {
+            return false;
+        }
+
+        this.dragonUsedInRound =
             this.waveManager
                 ?.getCurrentWave?.() ?? 1;
 
@@ -2520,6 +2824,24 @@ export default class GameScene extends Phaser.Scene {
             ?.destroy();
 
         this.healthPickup =
+            null;
+
+        this.secondBoostPickup
+            ?.destroy();
+
+        this.secondBoostPickup =
+            null;
+
+        this.dragonPickup
+            ?.destroy();
+
+        this.dragonPickup =
+            null;
+
+        this.dragonStrike
+            ?.destroy();
+
+        this.dragonStrike =
             null;
 
         this.damageBoost

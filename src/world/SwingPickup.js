@@ -20,6 +20,16 @@ const ARC_OFFSET_X = 168;
 const ARC_OFFSET_Y = 260;
 
 /*
+ * Caida hasta el fondo del arco, justo debajo del gancho. Es el
+ * tercer sitio donde se puede poner un recogible: el balanceo es un
+ * pendulo de esta longitud, y los dos extremos de arriba estan sobre
+ * esa misma circunferencia (168 y 260 dan 309, practicamente lo
+ * mismo). Es el punto donde el ninja queda colgado nada mas
+ * engancharse, antes de empezar a abrirse.
+ */
+const ARC_BOTTOM_Y = 300;
+
+/*
  * Escala del dibujo de balanceo respecto al jugador, y alto de su
  * caja. Con ambos se pasa el punto del arco a coordenadas del mundo.
  */
@@ -78,6 +88,35 @@ export default class SwingPickup {
                 Number(configuration.availableFromRound) || 1
             );
 
+        /*
+         * Rondas sueltas en las que aparece, cuando no vale un "de
+         * la ronda N en adelante". El dragon lo usa: solo sale en la
+         * 6 y en la 8.
+         */
+        this.availableRounds =
+            Array.isArray(
+                configuration.availableRounds
+            )
+                ? configuration.availableRounds
+                    .map(
+                        (n) => Math.floor(Number(n))
+                    )
+                    .filter(Number.isFinite)
+                : null;
+
+        /*
+         * Dibujo del recogible. Si se da una imagen se usa esa; si
+         * no, un texto. El dragon va con imagen a proposito: su
+         * emoji no esta en todas las fuentes y en algunos moviles
+         * saldria como un cuadro vacio.
+         */
+        this.textureKey =
+            configuration.textureKey ?? null;
+
+        this.textureScale =
+            Number(configuration.textureScale) ||
+            1;
+
         this.label =
             configuration.label ?? "?";
 
@@ -111,10 +150,12 @@ export default class SwingPickup {
             (() => false);
 
         /*
-         * Gancho que esta ocupando otro recogible. Se evita, para que
-         * los dos no se dibujen uno encima del otro.
+         * Ganchos que estan ocupando otros recogibles. Se evitan,
+         * para que no se dibujen unos encima de otros. Admite un id
+         * suelto o una lista, y los nulos se descartan.
          */
-        this.avoidHookId =
+        this.avoidHooks =
+            configuration.avoidHooks ??
             configuration.avoidHookId ??
             (() => null);
 
@@ -131,15 +172,17 @@ export default class SwingPickup {
             );
 
         /*
-         * Lado del arco que ocupa: -1 el de la izquierda, +1 el de la
-         * derecha. El ninja barre los dos al balancearse, asi que los
-         * dos quedan al alcance. Dando un lado a cada recogible, nunca
-         * se dibujan uno encima del otro aunque compartan colgante.
+         * Sitio del arco que ocupa: -1 el extremo izquierdo, +1 el
+         * derecho y 0 el fondo, debajo del gancho. El ninja pasa por
+         * los tres al colgarse y abrirse, asi que los tres estan a
+         * su alcance. Con un sitio para cada recogible, los tres que
+         * hay ahora (x2, corazon y dragon) no se dibujan nunca uno
+         * encima de otro, ni compartiendo colgante.
          */
         this.arcSide =
-            Number(configuration.arcSide) < 0
-                ? -1
-                : 1;
+            SwingPickup.normalizeSide(
+                configuration.arcSide
+            );
 
         this.depth =
             Number.isFinite(
@@ -155,16 +198,23 @@ export default class SwingPickup {
          */
         this.hookId = null;
 
-        /*
-         * Lado del arco que esta usando ahora mismo. Puede ser el
-         * contrario al preferido, si por ese el objeto se saldria de
-         * la pantalla.
-         */
-        this.activeSide = this.arcSide;
-
         this.elapsed = 0;
 
         this.isDestroyed = false;
+    }
+
+    static normalizeSide(value) {
+        const n = Number(value);
+
+        if (!Number.isFinite(n)) {
+            return 1;
+        }
+
+        if (n === 0) {
+            return 0;
+        }
+
+        return n < 0 ? -1 : 1;
     }
 
     // =========================================================
@@ -180,6 +230,22 @@ export default class SwingPickup {
         }
 
         this.text?.destroy();
+
+        if (this.textureKey) {
+            this.text =
+                this.scene.add
+                    .image(
+                        0,
+                        0,
+                        this.textureKey
+                    )
+                    .setOrigin(0.5)
+                    .setScale(this.textureScale)
+                    .setDepth(this.depth)
+                    .setVisible(false);
+
+            return;
+        }
 
         this.text =
             this.scene.add
@@ -229,10 +295,6 @@ export default class SwingPickup {
         this.elapsed +=
             Number.isFinite(delta) ? delta : 0;
 
-        this.activeSide =
-            this.resolveSide(hook) ||
-            this.arcSide;
-
         const position =
             this.getWorldPosition(hook);
 
@@ -259,6 +321,11 @@ export default class SwingPickup {
             Math.floor(
                 Number(this.getRound()) || 1
             );
+
+        if (this.availableRounds) {
+            return this.availableRounds
+                .includes(round);
+        }
 
         return round >= this.availableFromRound;
     }
@@ -297,14 +364,12 @@ export default class SwingPickup {
         }
 
         /*
-         * El que ocupa el otro recogible va al final: se usa solo si
-         * no queda ninguno libre.
+         * Los que ocupan los demas recogibles van al final: se usan
+         * solo si no queda ninguno libre.
          */
-        const ocupado = this.avoidHookId();
-
         const libres =
             hooks.filter(
-                (hook) => hook.id !== ocupado
+                (hook) => !this.isTaken(hook.id)
             );
 
         const candidatos =
@@ -326,51 +391,37 @@ export default class SwingPickup {
     }
 
     /*
-     * Un gancho sirve si por alguno de los dos lados del arco el
-     * objeto queda holgadamente dentro de la pantalla.
+     * Un gancho sirve si el objeto queda holgadamente dentro de la
+     * pantalla.
      */
     isHookUsable(hook) {
-        return this.resolveSide(hook) !== 0;
+        if (!hook) {
+            return false;
+        }
+
+        return this.fitsOnScreen(
+            this.getWorldPosition(
+                hook,
+                this.arcSide
+            )
+        );
     }
 
     /*
-     * Lado del arco por el que este gancho vale, o 0 si no vale por
-     * ninguno. Se prueba primero el lado propio; el contrario solo se
-     * usa si el colgante no lo esta ocupando el otro recogible, para
-     * no dibujar los dos en el mismo punto.
+     * Si ese gancho lo esta usando ya otro recogible.
      */
-    resolveSide(hook) {
-        if (!hook) {
-            return 0;
+    isTaken(id) {
+        if (!id) {
+            return false;
         }
 
-        if (
-            this.fitsOnScreen(
-                this.getWorldPosition(
-                    hook,
-                    this.arcSide
-                )
-            )
-        ) {
-            return this.arcSide;
+        const ocupados = this.avoidHooks();
+
+        if (Array.isArray(ocupados)) {
+            return ocupados.includes(id);
         }
 
-        if (hook.id === this.avoidHookId()) {
-            return 0;
-        }
-
-        if (
-            this.fitsOnScreen(
-                this.getWorldPosition(
-                    hook,
-                    -this.arcSide
-                )
-            )
-        ) {
-            return -this.arcSide;
-        }
-
-        return 0;
+        return ocupados === id;
     }
 
     fitsOnScreen(position) {
@@ -389,8 +440,14 @@ export default class SwingPickup {
      * Punto del arco, en coordenadas del mundo.
      */
     getWorldPosition(hook, side = null) {
+        /*
+         * Ojo: el lado puede ser 0, que es un sitio valido, asi que
+         * no vale un "si no hay valor" a secas.
+         */
         const lado =
-            Number(side) || this.activeSide;
+            side === null || side === undefined
+                ? this.arcSide
+                : SwingPickup.normalizeSide(side);
 
         const player = this.getPlayerSprite();
 
@@ -398,6 +455,11 @@ export default class SwingPickup {
             Number(player?.scaleX) || 0.85;
 
         const art = scale * GRAPPLE_ART;
+
+        const caida =
+            lado === 0
+                ? ARC_BOTTOM_Y
+                : ARC_OFFSET_Y;
 
         return {
             x:
@@ -410,7 +472,7 @@ export default class SwingPickup {
 
             y:
                 hook.y +
-                (ARC_OFFSET_Y * art) -
+                (caida * art) -
                 (
                     (PLAYER_BODY_HEIGHT / 2) *
                     scale

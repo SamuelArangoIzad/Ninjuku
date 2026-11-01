@@ -6,6 +6,9 @@ import HighScoreSystem
 import RetroButton
     from "../ui/RetroButton.js";
 
+import BackgroundMusic
+    from "../systems/BackgroundMusic.js";
+
 
 export default class MenuScene extends Phaser.Scene {
     constructor() {
@@ -100,7 +103,17 @@ export default class MenuScene extends Phaser.Scene {
     // Create
     // =========================================================
 
+    /*
+     * Lo unico que carga el menu es la musica, para que suene desde
+     * la primera pantalla y no solo al entrar en la partida.
+     */
+    preload() {
+        BackgroundMusic.load(this);
+    }
+
     create() {
+        BackgroundMusic.start(this);
+
         this.isDestroyed =
             false;
 
