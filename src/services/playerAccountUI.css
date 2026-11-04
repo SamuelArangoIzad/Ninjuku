@@ -1,0 +1,14 @@
+#ninjuku-account { position:fixed; top:12px; right:12px; z-index:2000; font:14px/1.4 system-ui,sans-serif; color:#f5f5f5; pointer-events:auto; user-select:text; }
+#ninjuku-account button { cursor:pointer; background:#7f1d1d; color:white; border:1px solid #d97706; border-radius:5px; padding:8px 12px; font:inherit; }
+#ninjuku-account-panel { width:min(320px,calc(100vw - 28px)); max-height:85vh; overflow:auto; background:#141414; border:1px solid #b45309; border-radius:8px; padding:14px; margin-top:8px; box-sizing:border-box; box-shadow:0 8px 25px #000b; }
+#ninjuku-account-panel[hidden], #ninjuku-auth-form[hidden], #ninjuku-player-profile[hidden] { display:none !important; }
+.ninjuku-account-head { display:flex; justify-content:space-between; align-items:center; }
+#ninjuku-account label { display:block; margin:10px 0; }
+#ninjuku-account input { display:block; box-sizing:border-box; width:100%; margin-top:4px; padding:8px; border-radius:4px; border:1px solid #777; background:#222; color:white; font:inherit; }
+.ninjuku-account-actions { display:flex; gap:8px; }
+#ninjuku-account-status { color:#e8bd70; overflow-wrap:anywhere; }
+#ninjuku-player-email, #ninjuku-player-stats { overflow-wrap:anywhere; }
+
+#ninjuku-account-guest { margin-top:12px; width:100%; background:#303030 !important; border-color:#777 !important; }
+.ninjuku-account-intro { font-size:13px; line-height:1.5; color:#ddd; }
+#ninjuku-account-toggle { box-shadow:0 2px 12px #000a; }

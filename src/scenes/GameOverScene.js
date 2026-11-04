@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { saveGameResult } from "../services/playerCloud.js";
 
 import HighScoreSystem
     from "../systems/HighScoreSystem.js";
@@ -144,6 +145,7 @@ export default class GameOverScene extends Phaser.Scene {
 
         this.hasSavedScore =
             false;
+        this.cloudGameId = crypto.randomUUID();
 
         this.isTransitioning =
             false;
@@ -1014,6 +1016,12 @@ export default class GameOverScene extends Phaser.Scene {
 
         this.hasSavedScore =
             true;
+
+        void saveGameResult(this.cloudGameId, this.finalScore)
+            .then(result => {
+                if (!result.saved) console.info('[Ninjuku]', result.reason);
+            })
+            .catch(error => console.error('[Ninjuku] Error al guardar partida:', error));
 
         this.showResult();
 

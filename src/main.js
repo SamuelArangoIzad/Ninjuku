@@ -1,4 +1,6 @@
 import Phaser from "phaser";
+import { initializePlayerAccountUI } from "./services/playerAccountUI.js";
+initializePlayerAccountUI();
 
 import "./style.css";
 
