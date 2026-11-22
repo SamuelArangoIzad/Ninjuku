@@ -1,3 +1,4 @@
+import { tacticalDecision } from "./EnemyTactics.js";
 export default class SoldierAI {
     constructor(
         enemy,
@@ -395,6 +396,16 @@ export default class SoldierAI {
                 direction
             );
 
+            return;
+        }
+
+        const tactic = tacticalDecision(this.enemy, targetSprite.x, time);
+        if (tactic?.action === "retreat") {
+            this.walkTowardsTarget(tactic.direction);
+            return;
+        }
+        if (tactic?.action === "hold") {
+            this.enemy?.setIdle?.();
             return;
         }
 

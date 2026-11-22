@@ -72,6 +72,7 @@ import EntityUIManager
 
 import ScoreSystem
     from "../systems/ScoreSystem.js";
+import PauseMenu from "../ui/PauseMenu.js";
 
 
 /*
@@ -1640,6 +1641,10 @@ export default class GameScene extends Phaser.Scene {
                 }
             );
 
+        this.pauseMenu = new PauseMenu(this, {
+            onExit: () => this.scene.start("MenuScene")
+        });
+
         this.enemyManager.setSystems({
             combatSystem:
                 this.combatSystem,
@@ -1871,7 +1876,7 @@ export default class GameScene extends Phaser.Scene {
     // =========================================================
 
     update(time, delta) {
-        if (this.isShuttingDown) {
+        if (this.isShuttingDown || this.pauseMenu?.isOpen) {
             return;
         }
 
@@ -2461,6 +2466,8 @@ export default class GameScene extends Phaser.Scene {
 
         this.energyBar?.handleResize(resizeData);
 
+        this.pauseMenu?.handleResize?.(gameSize);
+
         this.scoreSystem
             ?.handleResize?.(
                 resizeData
@@ -2666,6 +2673,8 @@ export default class GameScene extends Phaser.Scene {
             true;
 
         this.cancelGameOverTimer();
+        this.pauseMenu?.destroy();
+        this.pauseMenu = null;
 
         this.scale.off(
             Phaser.Scale.Events.RESIZE,

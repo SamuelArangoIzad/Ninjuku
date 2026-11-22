@@ -6,6 +6,7 @@ import { Samurai }
 
 import GameSettings
     from "../config/GameSettings.js";
+import { tacticalProfile } from "../ai/EnemyTactics.js";
 
 
 export default class EnemyManager {
@@ -38,6 +39,7 @@ export default class EnemyManager {
          * por lo que NUNCA debe reemplazarse.
          */
         this.enemies = [];
+        this.tacticalSpawnIndex = 0;
 
         /*
          * Pool compartido.
@@ -338,6 +340,13 @@ export default class EnemyManager {
          */
         enemy.enemyType =
             normalizedType;
+
+        // Asignación cíclica de tres estilos, también al reutilizar el pool.
+        const profile = tacticalProfile(this.tacticalSpawnIndex++);
+        enemy.tacticalProfile = profile;
+        enemy.tacticalPeers = () => this.enemies;
+        enemy.attackCooldown = (GameSettings[normalizedType]?.attackCooldown ?? 1300) + profile.cooldownBonus;
+        enemy.tacticalReadyAt = (this.scene?.time?.now ?? 0) + profile.reaction;
 
         this.enemies.push(
             enemy

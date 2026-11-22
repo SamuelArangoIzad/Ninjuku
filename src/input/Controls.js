@@ -657,6 +657,15 @@ export default class Controls {
         }
     }
 
+    /** Oculta o recupera los controles al abrir/cerrar la pausa. */
+    setVisible(visible) {
+        if (!visible) this.resetTouchState();
+        for (const button of this.touchControls) {
+            button.background?.setVisible?.(Boolean(visible));
+            button.text?.setVisible?.(Boolean(visible));
+        }
+    }
+
     // =========================================================
     // Destrucción
     // =========================================================

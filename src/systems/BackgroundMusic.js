@@ -39,9 +39,20 @@ let lifecycleBound = false;
  * para no reanudarla cuando el jugador la habia parado por su cuenta.
  */
 let pausedByPage = false;
+let userMuted = false;
 
 
 export default class BackgroundMusic {
+    static isMuted() { return userMuted; }
+
+    static setMuted(scene, muted) {
+        userMuted = Boolean(muted);
+        const track = scene?.sound?.get?.(MUSIC_KEY);
+        track?.setMute?.(userMuted);
+        return userMuted;
+    }
+
+    static toggleMuted(scene) { return BackgroundMusic.setMuted(scene, !userMuted); }
     /*
      * Pide el archivo. Se llama desde el preload de la primera
      * escena que lo necesite; si ya esta pedido, no hace nada.
@@ -90,6 +101,7 @@ export default class BackgroundMusic {
             manager.get?.(MUSIC_KEY) ?? null;
 
         if (existente) {
+            existente.setMute?.(userMuted);
             if (!existente.isPlaying) {
                 BackgroundMusic.play(
                     manager,
@@ -105,7 +117,8 @@ export default class BackgroundMusic {
                 MUSIC_KEY,
                 {
                     loop: true,
-                    volume: VOLUME
+                    volume: VOLUME,
+                    mute: userMuted
                 }
             );
 
