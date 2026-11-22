@@ -1,3 +1,5 @@
+import HangingSupportVisual from "./HangingSupportVisual.js";
+
 /*
  * Objeto colgado de las ramas de cerezo del fondo.
  *
@@ -98,19 +100,14 @@ const BRANCH_ANCHORS = {
  */
 // G1.7: anclajes sobre las ramas de la nueva panorámica de 3 tramos.
 // Coordenadas en píxeles de cada sección de 1800 x 900.
+// Un soporte por segmento panorámico, manteniendo los anclajes
+// existentes sobre ramas. La distancia en el mapa entre soportes
+// sucesivos es de 1670 a 1940 píxeles, también al cerrar el ciclo.
+// Los puntos de enganche físicos no cambian: solo disminuye su frecuencia.
 const PANORAMA_ANCHORS = {
-    "background-1": [
-        { x: 360, y: 110 },
-        { x: 1320, y: 100 }
-    ],
-    "background-2": [
-        { x: 400, y: 120 },
-        { x: 1460, y: 105 }
-    ],
-    "background-3": [
-        { x: 380, y: 105 },
-        { x: 1450, y: 110 }
-    ]
+    "background-1": [{ x: 1320, y: 100 }],
+    "background-2": [{ x: 1460, y: 105 }],
+    "background-3": [{ x: 1450, y: 110 }]
 };
 
 const VISIBILITY_MARGIN = 400;
@@ -261,7 +258,7 @@ export default class HangingPropManager {
          * rama es el gancho del que cuelga la cadena, que está en la
          * fila 0 del dibujo y centrado (columnas 69 a 74 de 142).
          */
-        return this.scene.add
+        const image = this.scene.add
             .image(
                 0,
                 0,
@@ -277,6 +274,8 @@ export default class HangingPropManager {
              */
             .setScrollFactor(0)
             .setVisible(false);
+        image.support = new HangingSupportVisual(this.scene, this.depth - 0.5);
+        return image;
     }
 
     // =========================================================
@@ -302,6 +301,8 @@ export default class HangingPropManager {
             );
 
         let used = 0;
+        const groundY = this.scene?.ground?.getSurfaceY?.() ??
+            (this.scene?.scale?.height ?? 400) - 28;
 
         this.hooks.length = 0;
 
@@ -356,6 +357,7 @@ export default class HangingPropManager {
                 image.setScale(scale);
 
                 image.setVisible(true);
+                image.support?.update(x, image.y, groundY, scale);
 
                 /*
                  * El identificador lleva el serial del panel: si ese
@@ -382,8 +384,8 @@ export default class HangingPropManager {
             index < this.pool.length;
             index += 1
         ) {
-            this.pool[index]
-                .setVisible(false);
+            this.pool[index].setVisible(false);
+            this.pool[index].support?.hide();
         }
     }
 
@@ -479,6 +481,7 @@ export default class HangingPropManager {
 
     destroyPool() {
         for (const image of this.pool) {
+            image?.support?.destroy();
             image?.destroy();
         }
 

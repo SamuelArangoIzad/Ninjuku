@@ -1875,6 +1875,8 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
 
+        this.ground?.update?.(delta);
+
         this.backgroundManager
             ?.update(
                 delta
@@ -1911,6 +1913,27 @@ export default class GameScene extends Phaser.Scene {
                 delta,
                 this.controls
             );
+
+        // El triángulo/K lanza shuriken también desde el suelo.
+        // Colgado lo procesa GrappleController para conservar el
+        // lanzamiento según la dirección real del balanceo.
+        if (!this.grappleController?.isHooked?.()) {
+            const requested = this.controls?.shuriken?.() ?? false;
+            const now = this.time.now;
+            if (requested && playerIsAlive &&
+                !this.grappleController?.suspendsPlayer?.() &&
+                now - (this.lastGroundShurikenAt ?? -Infinity) >= 220) {
+                const sprite = this.player?.getSprite?.();
+                const direction = this.player?.facingDirection ?? 1;
+                if (sprite?.body && this.shurikenSystem?.throwFrom?.(
+                    sprite.x + (direction * 26),
+                    sprite.body.top + (sprite.body.height * 0.48),
+                    direction
+                )) {
+                    this.lastGroundShurikenAt = now;
+                }
+            }
+        }
 
         this.energyBar?.setPercentage(this.energy?.getPercentage() ?? 1);
 

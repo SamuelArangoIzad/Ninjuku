@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { computeActionLayout, computeControlMetrics } from "./actionLayout.js";
 
 export default class Controls {
     constructor(scene) {
@@ -33,9 +34,11 @@ export default class Controls {
             /*
              * Botones de acción del lado derecho.
              *
-             *              ○
+             *              △
              *
-             *         ×         □
+             *         □         ○
+             *
+             *              ×
              */
             actionGroup: {
                 rightOffset: 38,
@@ -99,7 +102,10 @@ export default class Controls {
 
                 grapple:
                     Phaser.Input.Keyboard
-                        .KeyCodes.H
+                        .KeyCodes.H,
+
+                shuriken:
+                    Phaser.Input.Keyboard.KeyCodes.K
             });
 
         // =====================================================
@@ -124,7 +130,9 @@ export default class Controls {
             jumpJustPressed: false,
 
             attackHeld: false,
-            attackJustPressed: false
+            attackJustPressed: false,
+            shurikenHeld: false,
+            shurikenJustPressed: false
         };
 
         this.touchControls = [];
@@ -177,39 +185,13 @@ export default class Controls {
                 "movement"
             );
 
-        /*
-         * Grupo derecho con símbolos tipo PSP.
-         *
-         * ○ = saltar
-         * × = correr
-         * □ = atacar
-         */
-        this.jumpButton =
-            this.createButton(
-                0,
-                0,
-                buttonSize,
-                "○",
-                "action"
-            );
-
-        this.runButton =
-            this.createButton(
-                0,
-                0,
-                buttonSize,
-                "×",
-                "action"
-            );
-
-        this.attackButton =
-            this.createButton(
-                0,
-                0,
-                buttonSize,
-                "□",
-                "action"
-            );
+        // Botones de acción: cruz simétrica (△ arriba, □ izquierda,
+        // ○ derecha, × abajo). Cada símbolo se dibuja como vector para
+        // evitar el contraste desigual de los caracteres de fuente.
+        this.shurikenButton = this.createButton(0, 0, buttonSize, "△", "action");
+        this.attackButton = this.createButton(0, 0, buttonSize, "□", "action");
+        this.jumpButton = this.createButton(0, 0, buttonSize, "○", "action");
+        this.runButton = this.createButton(0, 0, buttonSize, "×", "action");
 
         // Movimiento sostenido.
         this.bindHoldButton(
@@ -241,6 +223,12 @@ export default class Controls {
             this.attackButton,
             "attackHeld",
             "attackJustPressed"
+        );
+
+        this.bindActionButton(
+            this.shurikenButton,
+            "shurikenHeld",
+            "shurikenJustPressed"
         );
 
         this.positionTouchControls();
@@ -292,36 +280,32 @@ export default class Controls {
                 ? this.layout.textSize.arrows
                 : this.layout.textSize.action;
 
-        const text =
-            this.scene.add.text(
-                x,
-                y,
-                label,
-                {
-                    fontFamily:
-                        "Arial, sans-serif",
-
-                    fontSize:
-                        `${fontSize}px`,
-
-                    color:
-                        "#ffffff",
-
-                    fontStyle:
-                        "bold"
-                }
-            );
-
-        text
-            .setOrigin(0.5)
-            .setScrollFactor(0)
-            .setDepth(1001);
-
-        /*
-         * El texto no recibe eventos para que el toque
-         * siempre llegue al círculo.
-         */
-        text.disableInteractive();
+        // Las acciones usan geometría vectorial, con igual grosor y
+        // luminosidad. Las flechas conservan sus caracteres de texto.
+        let text;
+        if (type === "action") {
+            text = this.scene.add.graphics();
+            text.lineStyle(2.7, 0xffffff, 1);
+            const r = 8.5;
+            if (label === "×") {
+                text.lineBetween(-r, -r, r, r);
+                text.lineBetween(-r, r, r, -r);
+            } else if (label === "○") {
+                text.strokeCircle(0, 0, r);
+            } else if (label === "□") {
+                text.strokeRect(-r, -r, r * 2, r * 2);
+            } else if (label === "△") {
+                text.strokeTriangle(0, -r - 1, -r - 1, r, r + 1, r);
+            }
+            text.setPosition(x, y).setScrollFactor(0).setDepth(1001);
+        } else {
+            text = this.scene.add.text(x, y, label, {
+                fontFamily: "Arial, sans-serif",
+                fontSize: `${fontSize}px`,
+                color: "#ffffff",
+                fontStyle: "bold"
+            }).setOrigin(0.5).setScrollFactor(0).setDepth(1001);
+        }
 
         const button = {
             background,
@@ -343,128 +327,32 @@ export default class Controls {
     // =========================================================
 
     positionTouchControls() {
-        const width =
-            this.scene.scale.width;
+        const width = this.scene.scale.width;
+        const height = this.scene.scale.height;
+        const metrics = computeControlMetrics(width, height);
+        // Reducimos las áreas visibles, manteniendo la zona interactiva ampliada.
+        const scale = metrics.size / this.layout.buttonSize;
+        for (const button of this.touchControls) {
+            button.background.setScale(scale);
+            button.text.setScale(scale);
+        }
 
-        const height =
-            this.scene.scale.height;
+        const bottomY = Math.round(height - metrics.edge);
+        const movementSpacing = Math.round(Math.max(metrics.size + 10, metrics.spacing * 0.94));
+        const leftX = Math.round(metrics.edge);
+        this.setButtonPosition(this.leftButton, leftX, bottomY);
+        this.setButtonPosition(this.rightButton, leftX + movementSpacing, bottomY);
 
-        const buttonRadius =
-            this.layout.buttonSize / 2;
-
-        /*
-         * Fila inferior.
-         *
-         * El clamp impide que los botones queden cortados.
-         */
-        const bottomY =
-            Phaser.Math.Clamp(
-                height -
-                    this.layout.bottomOffset,
-
-                buttonRadius + 3,
-
-                height -
-                    buttonRadius -
-                    3
-            );
-
-        // =====================================================
-        // Grupo izquierdo: ◀ ▶
-        // =====================================================
-
-        const movementLeft =
-            this.layout
-                .movementGroup
-                .leftOffset;
-
-        const movementSpacing =
-            this.layout
-                .movementGroup
-                .spacing;
-
-        this.setButtonPosition(
-            this.leftButton,
-            movementLeft,
-            bottomY
-        );
-
-        this.setButtonPosition(
-            this.rightButton,
-            movementLeft +
-                movementSpacing,
-            bottomY
-        );
-
-        // =====================================================
-        // Grupo derecho triangular
-        // =====================================================
-
-        const rightOffset =
-            this.layout
-                .actionGroup
-                .rightOffset;
-
-        const horizontalSpacing =
-            this.layout
-                .actionGroup
-                .horizontalSpacing;
-
-        const verticalSpacing =
-            this.layout
-                .actionGroup
-                .verticalSpacing;
-
-        /*
-         * □ Atacar: vértice inferior derecho.
-         */
-        const attackX =
-            width -
-            rightOffset;
-
-        const attackY =
-            bottomY;
-
-        /*
-         * × Correr: vértice inferior izquierdo.
-         */
-        const runX =
-            attackX -
-            horizontalSpacing;
-
-        const runY =
-            bottomY;
-
-        /*
-         * ○ Saltar: vértice superior centrado.
-         */
-        const jumpX =
-            (
-                runX +
-                attackX
-            ) / 2;
-
-        const jumpY =
-            bottomY -
-            verticalSpacing;
-
-        this.setButtonPosition(
-            this.runButton,
-            runX,
-            runY
-        );
-
-        this.setButtonPosition(
-            this.attackButton,
-            attackX,
-            attackY
-        );
-
-        this.setButtonPosition(
-            this.jumpButton,
-            jumpX,
-            jumpY
-        );
+        const layout = computeActionLayout(width, height, {
+            size: metrics.size,
+            spacing: metrics.spacing,
+            rightOffset: metrics.edge,
+            bottomOffset: metrics.edge
+        });
+        this.setButtonPosition(this.shurikenButton, layout.triangle.x, layout.triangle.y);
+        this.setButtonPosition(this.attackButton, layout.square.x, layout.square.y);
+        this.setButtonPosition(this.jumpButton, layout.circle.x, layout.circle.y);
+        this.setButtonPosition(this.runButton, layout.cross.x, layout.cross.y);
     }
 
     setButtonPosition(
@@ -517,7 +405,7 @@ export default class Controls {
             0.95
         );
 
-        button.text.setScale(0.90);
+        button.text.setScale(button.background.scaleX * 0.90);
     }
 
     restoreButtonAppearance(button) {
@@ -536,7 +424,7 @@ export default class Controls {
             this.layout.borderAlpha
         );
 
-        button.text.setScale(1);
+        button.text.setScale(button.background.scaleX);
     }
 
     // =========================================================
@@ -713,6 +601,13 @@ export default class Controls {
         );
     }
 
+    shuriken() {
+        const keyboard = Phaser.Input.Keyboard.JustDown(this.keys.shuriken);
+        const touch = this.touchState.shurikenJustPressed;
+        this.touchState.shurikenJustPressed = false;
+        return keyboard || touch;
+    }
+
     attack() {
         const keyboardAttack =
             Phaser.Input.Keyboard.JustDown(
@@ -749,6 +644,8 @@ export default class Controls {
 
         this.touchState.attackHeld = false;
         this.touchState.attackJustPressed = false;
+        this.touchState.shurikenHeld = false;
+        this.touchState.shurikenJustPressed = false;
 
         for (
             const button
@@ -792,6 +689,7 @@ export default class Controls {
         this.runButton = null;
         this.jumpButton = null;
         this.attackButton = null;
+        this.shurikenButton = null;
 
         this.cursors = null;
         this.keys = null;

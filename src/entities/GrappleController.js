@@ -412,6 +412,10 @@ export default class GrappleController {
     // Consultas
     // =========================================================
 
+    isHooked() {
+        return this.state === HOOKED;
+    }
+
     isActive() {
         return this.state !== IDLE;
     }
@@ -1075,14 +1079,12 @@ export default class GrappleController {
      * alto pasa: apuntar es elegir desde donde lanzar.
      */
     updateShuriken(sprite, controls) {
-        if (
-            !this.shurikenSystem ||
-            this.swingProgress === 0
-        ) {
-            return;
-        }
-
-        if (!controls?.attack?.()) {
+        // Consumir la pulsación incluso en posición vertical para que
+        // no quede un lanzamiento pendiente al iniciar el balanceo.
+        const requested = Boolean(
+            controls?.shuriken?.() || controls?.attack?.()
+        );
+        if (!requested || !this.shurikenSystem || this.swingProgress === 0) {
             return;
         }
 
