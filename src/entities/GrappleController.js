@@ -148,6 +148,66 @@ const SWING_RATE = 16;
 /*
  * Tiempo minimo entre shuriken, en milisegundos.
  */
+/*
+ * Alcance del kusarigama, en fraccion del alto de la pantalla.
+ *
+ * No es un circulo, es una elipse: hacia arriba se llega lejos y de
+ * lado mucho menos. Tirar la cadena en alto es creible; que a uno lo
+ * arrastren media pantalla de costado, no.
+ *
+ * Antes era un radio fijo de 620 px, y eso daba dos problemas. Medido
+ * sobre el juego, dejaba agarrar colgantes a 860 px de lado, que es lo
+ * que se veia como un salto imposible. Y al ser fijo, en un movil de
+ * 360 px de alto valia casi dos pantallas enteras, mientras que en
+ * escritorio apenas daba: el mismo numero significaba cosas muy
+ * distintas segun el tamano. En proporcion al alto, el alcance se
+ * siente igual en todas partes.
+ */
+const REACH_SIDE_RATIO = 0.45;
+const REACH_UP_RATIO = 0.85;
+
+/*
+ * Parte de la animacion de lanzamiento que el ninja pasa todavia en
+ * el suelo, tirando la cadena. El resto la emplea en subir.
+ *
+ * Sin esto el ninja se quedaba plantado toda la animacion y aparecia
+ * colgado de golpe al acabar: los colgantes estan entre 344 y 535 px
+ * por encima de sus pies, asi que el salto era de hasta 422 px de una
+ * sola vez. Ahora se le ve recorrer esa distancia.
+ */
+const LAUNCH_HOLD = 0.45;
+
+/*
+ * Ritmo de la subida, en pixeles por segundo.
+ *
+ * Antes la subida se repartia dentro de la animacion de lanzamiento,
+ * que dura 500 ms, asi que los 350 px tipicos se recorrian a mas de
+ * 1200 px/s: tan rapido que seguia pareciendo un salto. Ahora la
+ * subida tiene su propio tiempo, calculado por distancia, y el estado
+ * no pasa a colgado hasta que termina de verdad.
+ */
+const ASCENT_SPEED = 600;
+
+/*
+ * Topes para que un tramo corto no se sienta perezoso ni uno largo se
+ * haga eterno.
+ */
+const ASCENT_MIN_TIME = 420;
+const ASCENT_MAX_TIME = 950;
+
+/*
+ * Lineas de aire que acompanan la subida.
+ *
+ * Se dibujan a los dos costados de la silueta, nunca encima, y bajan
+ * mientras el ninja sube: son el rastro del aire que deja atras.
+ */
+const WIND_COUNT = 8;
+const WIND_INNER = 0.30;
+const WIND_OUTER = 0.95;
+const WIND_SPEED = 2.4;
+const WIND_ALPHA = 0.5;
+const WIND_COLOR = 0xdfefff;
+
 const SHURIKEN_COOLDOWN = 220;
 
 /*
@@ -184,14 +244,6 @@ export default class GrappleController {
             null;
 
         /*
-         * Distancia maxima a la que se puede enganchar una plataforma.
-         * Tiene que dar margen para balancearse sin chocar con nada.
-         */
-        this.maxDistance =
-            Number(configuration.maxDistance) ||
-            620;
-
-        /*
          * La plataforma tiene que estar por encima del jugador: no se
          * puede uno colgar de algo que esta a su altura.
          */
@@ -223,6 +275,20 @@ export default class GrappleController {
                 : 10;
 
         this.state = IDLE;
+
+        /*
+         * Punto de partida de la subida y tiempo transcurrido desde
+         * que se lanzo la cadena.
+         */
+        this.launchFrom = { x: 0, y: 0 };
+
+        this.launchElapsed = 0;
+
+        this.ascentTime = ASCENT_MIN_TIME;
+
+        this.windLines = [];
+
+        this.windGraphics = null;
 
         this.visual = null;
 
@@ -291,6 +357,16 @@ export default class GrappleController {
                 )
                 .setDepth(this.depth)
                 .setVisible(false);
+
+        /*
+         * Las lineas de aire van justo detras del ninja: asoman por
+         * los costados sin taparle la silueta.
+         */
+        this.windGraphics =
+            this.scene.add
+                ?.graphics?.()
+                ?.setDepth(this.depth - 1)
+                ?.setVisible(false) ?? null;
     }
 
     createAnimations() {
@@ -428,7 +504,7 @@ export default class GrappleController {
         }
 
         if (this.state === LAUNCHING) {
-            this.updateLaunching(sprite);
+            this.updateLaunching(sprite, delta);
 
             return;
         }
@@ -463,23 +539,9 @@ export default class GrappleController {
 
     tryHook(sprite) {
         const hook =
-            this.hangingPropManager
-                ?.findNearestHook?.(
-                    sprite.x,
-                    sprite.body.bottom,
-                    {
-                        maxDistance:
-                            this.maxDistance,
+            this.findReachableHook(sprite);
 
-                        minHeight:
-                            this.minHeight
-                    }
-                );
-
-        if (
-            !hook ||
-            !this.isHookOnScreen(hook)
-        ) {
+        if (!hook) {
             return false;
         }
 
@@ -500,9 +562,138 @@ export default class GrappleController {
 
         sprite.setVisible(false);
 
+        /*
+         * De donde sale y adonde tiene que llegar. La subida se
+         * interpola entre estos dos puntos durante el lanzamiento.
+         */
+        this.launchFrom = {
+            x: sprite.x,
+            y: sprite.body.bottom
+        };
+
+        this.launchElapsed = 0;
+
+        /*
+         * La subida dura segun lo que haya que subir, no segun lo que
+         * dure el dibujo de lanzamiento.
+         */
+        const destino = this.getHangPoint();
+
+        const recorrido =
+            Math.hypot(
+                destino.x - this.launchFrom.x,
+                destino.y - this.launchFrom.y
+            );
+
+        this.ascentTime =
+            Math.min(
+                ASCENT_MAX_TIME,
+                Math.max(
+                    ASCENT_MIN_TIME,
+                    (recorrido / ASCENT_SPEED) * 1000
+                )
+            );
+
+        this.seedWindLines();
+
         this.showLaunch(sprite, hook);
 
         return true;
+    }
+
+    /*
+     * El colgante mas cercano que de verdad queda al alcance de la
+     * cadena: dentro del encuadre, por encima del ninja y dentro de
+     * la elipse de alcance.
+     */
+    findReachableHook(sprite) {
+        const hooks =
+            this.hangingPropManager
+                ?.getHooks?.() ?? [];
+
+        const origenX = sprite.x;
+        const origenY = sprite.body.bottom;
+
+        const lado = this.getSideReach();
+        const alto = this.getUpReach();
+
+        let mejor = null;
+        let mejorDistancia = Infinity;
+
+        for (const hook of hooks) {
+            if (!this.isHookOnScreen(hook)) {
+                continue;
+            }
+
+            const subida = origenY - hook.y;
+
+            if (subida < this.minHeight) {
+                continue;
+            }
+
+            const dx =
+                Math.abs(hook.x - origenX) / lado;
+
+            const dy = subida / alto;
+
+            /*
+             * Fuera de la elipse no se llega, por cerca que parezca
+             * en linea recta.
+             */
+            if ((dx * dx) + (dy * dy) > 1) {
+                continue;
+            }
+
+            const distancia =
+                Math.hypot(
+                    hook.x - origenX,
+                    subida
+                );
+
+            if (distancia < mejorDistancia) {
+                mejor = hook;
+                mejorDistancia = distancia;
+            }
+        }
+
+        return mejor;
+    }
+
+    getSideReach() {
+        return (
+            Math.max(
+                1,
+                this.scene?.scale?.height ?? 1
+            ) * REACH_SIDE_RATIO
+        );
+    }
+
+    getUpReach() {
+        return (
+            Math.max(
+                1,
+                this.scene?.scale?.height ?? 1
+            ) * REACH_UP_RATIO
+        );
+    }
+
+    /*
+     * Donde quedan los pies al colgar en reposo. Es el destino de la
+     * subida, y es el mismo punto que usa el balanceo en su fotograma
+     * cero, asi que al terminar no hay ningun salto.
+     */
+    getHangPoint() {
+        const sheet = SHEETS.swingLeft;
+
+        const scale = this.getScale(sheet);
+
+        const [offsetX, offsetY] =
+            sheet.feetOffsets[0];
+
+        return {
+            x: this.hook.x + (offsetX * scale),
+            y: this.hook.y + (offsetY * scale)
+        };
     }
 
     /*
@@ -555,25 +746,207 @@ export default class GrappleController {
             true
         );
 
-        this.visual.once(
-            "animationcomplete",
-            () => {
-                if (this.state === LAUNCHING) {
-                    this.state = HOOKED;
-                }
-            }
-        );
+        /*
+         * Antes el fin de esta animacion pasaba a colgado. Ya no: la
+         * subida dura lo suyo y es ella la que remata el enganche,
+         * asi que el dibujo se queda en su ultimo fotograma mientras
+         * el ninja termina de subir.
+         */
     }
 
-    updateLaunching(sprite) {
+    updateLaunching(sprite, delta) {
         /*
-         * Durante el lanzamiento el ninja sigue en el suelo: el dibujo
-         * se queda donde está y solo sale la cadena.
+         * Se topa el delta igual que en el balanceo. Si el juego da
+         * un tiron, o la pestana vuelve de segundo plano, llega un
+         * delta enorme y la subida entera se consumiria en un solo
+         * fotograma: justo el salto que se queria quitar.
          */
-        this.visual.setPosition(
-            sprite.x,
-            sprite.body.bottom
-        );
+        this.launchElapsed +=
+            Math.min(
+                Number.isFinite(delta) ? delta : 0,
+                100
+            );
+
+        const sheet = SHEETS.launch;
+
+        /*
+         * El ninja tira la cadena con los pies en el suelo. Ese tramo
+         * sigue el ritmo del dibujo de lanzamiento.
+         */
+        const espera =
+            (sheet.frames / sheet.frameRate) *
+            1000 *
+            LAUNCH_HOLD;
+
+        const tiron =
+            this.launchElapsed <= espera
+                ? 0
+                : Math.min(
+                    1,
+                    (this.launchElapsed - espera) /
+                    this.ascentTime
+                );
+
+        /*
+         * Suavizado en los dos extremos: arranca despacio al tensarse
+         * la cadena, coge velocidad y se posa sin frenazo.
+         */
+        const avance =
+            tiron * tiron * (3 - (2 * tiron));
+
+        const destino = this.getHangPoint();
+
+        const x =
+            this.launchFrom.x +
+            ((destino.x - this.launchFrom.x) * avance);
+
+        const y =
+            this.launchFrom.y +
+            ((destino.y - this.launchFrom.y) * avance);
+
+        this.visual.setPosition(x, y);
+
+        /*
+         * El cuerpo acompana al dibujo. Si no, al soltarse a mitad de
+         * subida caeria desde donde estaba plantado.
+         */
+        sprite.body.reset(x, y);
+
+        this.drawWindLines(x, y, tiron);
+
+        /*
+         * Se pasa a colgado cuando acaba la subida, no cuando acaba
+         * el dibujo: el dibujo dura 500 ms y la subida puede durar
+         * mas, y rematar antes devolveria el salto seco del final.
+         */
+        if (tiron >= 1) {
+            this.hideWindLines();
+
+            this.state = HOOKED;
+        }
+    }
+
+    // =========================================================
+    // Líneas de aire
+    // =========================================================
+
+    /*
+     * Reparte las lineas de una subida a otra, para que no salgan
+     * siempre iguales. Cada una guarda su costado, su separacion del
+     * eje, su largo y el punto del ciclo por el que empieza.
+     */
+    seedWindLines() {
+        this.windLines = [];
+
+        for (
+            let index = 0;
+            index < WIND_COUNT;
+            index += 1
+        ) {
+            const lado = index % 2 === 0 ? -1 : 1;
+
+            const reparto =
+                (index + 1) / (WIND_COUNT + 1);
+
+            this.windLines.push({
+                lado,
+
+                /*
+                 * Separacion del centro, entre el borde de la
+                 * silueta y un poco mas afuera.
+                 */
+                separacion:
+                    WIND_INNER +
+                    (
+                        (WIND_OUTER - WIND_INNER) *
+                        ((index * 0.37) % 1)
+                    ),
+
+                largo: 0.18 + (((index * 0.53) % 1) * 0.3),
+
+                fase: reparto
+            });
+        }
+    }
+
+    /*
+     * Dibuja el aire que el ninja deja atras al subir. Las lineas
+     * bajan mientras el sube, y aparecen y se van con la propia
+     * subida para que no asomen ni antes ni despues.
+     */
+    drawWindLines(x, pies, tiron) {
+        const dibujo = this.windGraphics;
+
+        if (!dibujo) {
+            return;
+        }
+
+        dibujo.clear();
+
+        if (tiron <= 0 || tiron >= 1) {
+            dibujo.setVisible(false);
+
+            return;
+        }
+
+        const sheet = SHEETS.launch;
+
+        const scale = this.getScale(sheet);
+
+        const alto = sheet.frameHeight * scale;
+
+        const ancho = sheet.frameWidth * scale;
+
+        /*
+         * Mas fuerte en mitad del recorrido, que es donde mas corre,
+         * y apagandose en los extremos.
+         */
+        const fuerza =
+            Math.sin(tiron * Math.PI);
+
+        dibujo.setVisible(true);
+
+        for (const linea of this.windLines) {
+            /*
+             * La linea recorre el cuerpo de arriba abajo una y otra
+             * vez segun avanza la subida.
+             */
+            const recorrido =
+                (
+                    linea.fase +
+                    (tiron * WIND_SPEED)
+                ) % 1;
+
+            const inicioY =
+                pies - alto + (recorrido * alto);
+
+            const finalY =
+                inicioY + (linea.largo * alto);
+
+            const lineaX =
+                x +
+                (
+                    linea.lado *
+                    linea.separacion *
+                    (ancho / 2)
+                );
+
+            dibujo.lineStyle(
+                Math.max(1, 2 * scale * 1.6),
+                WIND_COLOR,
+                WIND_ALPHA * fuerza
+            );
+
+            dibujo.beginPath();
+            dibujo.moveTo(lineaX, inicioY);
+            dibujo.lineTo(lineaX, Math.min(finalY, pies));
+            dibujo.strokePath();
+        }
+    }
+
+    hideWindLines() {
+        this.windGraphics?.clear();
+        this.windGraphics?.setVisible(false);
     }
 
     // =========================================================
@@ -808,6 +1181,8 @@ export default class GrappleController {
         this.hook = null;
         this.hookId = null;
 
+        this.hideWindLines();
+
         const body = sprite.body;
 
         body.allowGravity = true;
@@ -903,6 +1278,9 @@ export default class GrappleController {
 
         this.visual?.destroy();
         this.visual = null;
+
+        this.windGraphics?.destroy();
+        this.windGraphics = null;
 
         this.scene = null;
         this.player = null;

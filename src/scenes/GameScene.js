@@ -70,9 +70,6 @@ import EntityUIManager
 import ScoreSystem
     from "../systems/ScoreSystem.js";
 
-import PerformanceMonitor
-    from "../debug/PerformanceMonitor.js";
-
 
 /*
  * Orden en el que se van encadenando los fondos. Al llegar al final
@@ -279,9 +276,6 @@ export default class GameScene extends Phaser.Scene {
             null;
 
         this.scoreSystem =
-            null;
-
-        this.performanceMonitor =
             null;
 
         // =====================================================
@@ -1676,21 +1670,6 @@ export default class GameScene extends Phaser.Scene {
                 }
             );
 
-        this.performanceMonitor =
-            new PerformanceMonitor(
-                this,
-                {
-                    enemyManager:
-                        this.enemyManager,
-
-                    visible:
-                        true,
-
-                    updateInterval:
-                        500
-                }
-            );
-
         this.enemyManager.setSystems({
             combatSystem:
                 this.combatSystem,
@@ -2040,11 +2019,6 @@ export default class GameScene extends Phaser.Scene {
                 ?.stop();
         }
 
-        this.performanceMonitor
-            ?.update(
-                time,
-                delta
-            );
     }
 
     // =========================================================
@@ -2495,11 +2469,6 @@ export default class GameScene extends Phaser.Scene {
                 resizeData
             );
 
-        this.performanceMonitor
-            ?.handleResize?.(
-                resizeData
-            );
-
         this.roundBanner
             ?.handleResize?.();
 
@@ -2711,16 +2680,6 @@ export default class GameScene extends Phaser.Scene {
             ?.destroy();
 
         this.playerGroundCollider =
-            null;
-
-        /*
-         * El monitor se destruye antes que EnemyManager porque
-         * todavía consulta sus métricas.
-         */
-        this.performanceMonitor
-            ?.destroy();
-
-        this.performanceMonitor =
             null;
 
         this.scoreSystem
