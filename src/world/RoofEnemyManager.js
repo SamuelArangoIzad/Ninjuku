@@ -1,3 +1,5 @@
+import { getRoofPropPlacement } from "./roofPropPlacement.js";
+import RoofHangingSupportVisual from "./RoofHangingSupportVisual.js";
 import HealthComponent
     from "../components/HealthComponent.js";
 
@@ -126,12 +128,9 @@ const THROW_COOLDOWN = 2200;
 const HURT_DURATION = 420;
 
 /*
- * Separacion del enganche respecto al costado izquierdo de la casa.
- *
- * A la izquierda porque es el lado por el que se llega. Deja sitio
- * para abrir el balanceo hacia la casa sin chocar con ella.
+ * La separación entre el colgante y la casa se calcula ahora en
+ * roofPropPlacement.js según el tamaño de pantalla.
  */
-const HOOK_SIDE_GAP = 190;
 
 /*
  * Caida tipica del ninja bajo el gancho, en pixeles del dibujo de
@@ -409,9 +408,14 @@ export default class RoofEnemyManager {
                 .setDepth(this.propDepth)
                 .setVisible(false);
 
+        // A diferencia de los colgantes del panorama, los de tejado
+        // también necesitan soporte. Cada elemento reutilizable tiene uno.
+        const propSupport = new RoofHangingSupportVisual(this.scene, this.propDepth - 0.5);
+
         const enemy = {
             sprite,
             prop,
+            propSupport,
 
             serial: null,
             alive: false,
@@ -647,6 +651,7 @@ export default class RoofEnemyManager {
 
         enemy.sprite.setVisible(false);
         enemy.prop.setVisible(false);
+        enemy.propSupport?.hide();
 
         if (enemy.sprite.body) {
             enemy.sprite.body.enable = false;
@@ -698,26 +703,31 @@ export default class RoofEnemyManager {
     placeProp(enemy, roof) {
         const house = roof.house;
 
-        const x =
-            house.boxLeft - HOOK_SIDE_GAP;
-
-        const y =
-            house.surfaceY - this.getHookDrop();
-
         const scale = this.getPropScale();
+        const placement = getRoofPropPlacement({
+            roofLeft: house.boxLeft,
+            roofY: house.surfaceY,
+            hookDrop: this.getHookDrop(),
+            propScale: scale,
+            screenWidth: this.scene.scale.width,
+            screenHeight: this.scene.scale.height,
+            plankRow: PROP_PLANK_ROW
+        });
+        const { x, topY: hookTopY, hookY: y } = placement;
 
-        /*
-         * La imagen se ancla por el gancho de arriba, asi que se sube
-         * lo que mide la cadena para que el tablon caiga justo en el
-         * punto del que se agarra el kusarigama.
-         */
         enemy.prop
             .setScale(scale)
-            .setPosition(
-                x,
-                y - (PROP_PLANK_ROW * scale)
-            )
+            .setPosition(x, hookTopY)
             .setVisible(true);
+
+        // El pilar nace del borde del tejado y la viga llega a la argolla.
+        enemy.propSupport?.update(
+            x,
+            hookTopY,
+            house.boxLeft,
+            house.surfaceY,
+            scale
+        );
 
         return {
             id: "roof:" + roof.serial,
@@ -923,6 +933,7 @@ export default class RoofEnemyManager {
 
             enemy.sprite?.destroy();
             enemy.prop?.destroy();
+            enemy.propSupport?.destroy();
             enemy.health?.destroy?.();
         }
 
