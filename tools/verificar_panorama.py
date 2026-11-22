@@ -2,7 +2,7 @@ from pathlib import Path
 from PIL import Image
 
 root = Path(__file__).resolve().parents[1] / "public/assets/backgrounds/panorama"
-master = Image.open(root / "ninjuku_panorama_master.webp").convert("RGB")
+master = Image.open(Path(__file__).resolve().parent / "assets/ninjuku_panorama_master.webp").convert("RGB")
 assert master.size == (5400, 900)
 tiles = [Image.open(root / f"panorama{i}.webp").convert("RGB") for i in (1, 2, 3)]
 assert all(tile.size == (1800, 900) for tile in tiles)
