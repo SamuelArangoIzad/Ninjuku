@@ -1,3 +1,5 @@
+import { formatRoundLabel } from "./japaneseLabels.js";
+
 /*
  * Letrero que anuncia la ronda que entra.
  *
@@ -64,9 +66,9 @@ export default class RoundBanner {
                     "",
                     {
                         fontFamily:
-                            "monospace",
+                            '"Noto Sans CJK JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif',
 
-                        fontSize: "64px",
+                        fontSize: "48px",
                         color: "#ffffff",
                         stroke: "#000000",
                         strokeThickness: 8,
@@ -86,7 +88,7 @@ export default class RoundBanner {
                     "",
                     {
                         fontFamily:
-                            "monospace",
+                            '"Noto Sans CJK JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif',
 
                         fontSize: "24px",
                         color: "#ffd77a",
@@ -118,6 +120,12 @@ export default class RoundBanner {
          */
         const centerY = height * 0.34;
 
+        // Ajuste dinámico para mantener el rótulo bilingüe dentro de móviles.
+        const titleSize = Math.max(17, Math.min(48, Math.floor(width / 24), Math.floor(height / 8)));
+        this.title?.setFontSize(titleSize);
+        this.title?.setWordWrapWidth(Math.max(100, width - 32));
+        this.subtitle?.setFontSize(Math.max(12, Math.min(24, Math.floor(width / 42), Math.floor(height / 16))));
+
         this.title?.setPosition(
             centerX,
             centerY
@@ -125,7 +133,7 @@ export default class RoundBanner {
 
         this.subtitle?.setPosition(
             centerX,
-            centerY + 52
+            centerY + Math.max(34, titleSize + 12)
         );
     }
 
@@ -140,14 +148,14 @@ export default class RoundBanner {
                 : "";
 
         this.show(
-            `RONDA ${number}`,
+            formatRoundLabel(number),
             detalle
         );
     }
 
     showFinished(rounds) {
         this.show(
-            "¡COMPLETADO!",
+            "達成 · ¡COMPLETADO!",
             `${rounds} rondas superadas`
         );
     }

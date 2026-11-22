@@ -100,6 +100,10 @@ export default class BackgroundManager {
                     0.49
                 );
 
+        // Cuando los PNG ya tienen un borde compartido, se dibuja
+        // una sola imagen opaca por panel, sin 16 segmentos de mezcla.
+        this.seamlessTiles = configuration.seamlessTiles ?? false;
+
         this.panels = [];
 
         this.backgroundScale = 1;
@@ -138,6 +142,9 @@ export default class BackgroundManager {
         this.panelSerial = 0;
 
         this.isDestroyed = false;
+
+        // Evita operaciones de renderizado sin desplazamiento visible.
+        this.lastRoundedOffset = null;
     }
 
     static normalizeTextureKeys(
@@ -184,7 +191,7 @@ export default class BackgroundManager {
 
         for (
             let pass = 0;
-            pass < 4;
+            pass < 2;
             pass += 1
         ) {
             value =
@@ -223,7 +230,7 @@ export default class BackgroundManager {
     // Creación
     // =========================================================
 
-    create() {
+    create({ preserveScroll = false } = {}) {
         if (
             this.isDestroyed ||
             !this.scene
@@ -231,7 +238,16 @@ export default class BackgroundManager {
             return;
         }
 
+        // El resize no debe devolver la secuencia al primer escenario.
+        const firstKey = preserveScroll && this.panels.length
+            ? this.textureKeys[this.panels[0].textureIndex]
+            : null;
+        const progress = preserveScroll && this.stepWidth > 0
+            ? this.scrollOffset / this.stepWidth
+            : 0;
+
         this.destroyPanels();
+        this.lastRoundedOffset = null;
 
         const availableKeys =
             this.textureKeys.filter(
@@ -313,8 +329,9 @@ export default class BackgroundManager {
                 )
             );
 
-        this.blendWidth =
-            Math.max(
+        this.blendWidth = this.seamlessTiles
+            ? 0
+            : Math.max(
                 1,
                 Math.floor(
                     this.tileWidth *
@@ -329,11 +346,13 @@ export default class BackgroundManager {
                 this.blendWidth
             );
 
-        this.scrollOffset =
-            this.scrollOffset %
-            this.stepWidth;
+        // El progreso relativo se conserva aunque cambie la escala.
+        this.scrollOffset = progress * this.stepWidth;
 
-        this.sequenceIndex = 0;
+        const restoredIndex = firstKey === null
+            ? -1
+            : this.textureKeys.indexOf(firstKey);
+        this.sequenceIndex = Math.max(0, restoredIndex);
 
         /*
          * Hacen falta los paneles que cubren la pantalla más dos de
@@ -423,14 +442,14 @@ export default class BackgroundManager {
 
         const segments = [];
 
-        for (
-            let index = 0;
-            index < FADE_SEGMENTS;
-            index += 1
-        ) {
-            segments.push(
-                this.createImage(centerY)
-            );
+        if (!this.seamlessTiles) {
+            for (
+                let index = 0;
+                index < FADE_SEGMENTS;
+                index += 1
+            ) {
+                segments.push(this.createImage(centerY));
+            }
         }
 
         const panel = {
@@ -527,12 +546,16 @@ export default class BackgroundManager {
                 blendSource - 1
             );
 
-        panel.body.setCrop(
-            bodyStart,
-            0,
-            size.width - bodyStart,
-            size.height
-        );
+        if (this.seamlessTiles) {
+            panel.body.setCrop(0, 0, size.width, size.height);
+        } else {
+            panel.body.setCrop(
+                bodyStart,
+                0,
+                size.width - bodyStart,
+                size.height
+            );
+        }
 
         panel.body.setAlpha(1);
 
@@ -640,6 +663,7 @@ export default class BackgroundManager {
 
         this.scrollOffset += movement;
 
+        let recycled = false;
         while (
             this.scrollOffset >=
             this.stepWidth
@@ -648,9 +672,10 @@ export default class BackgroundManager {
                 this.stepWidth;
 
             this.recycleFirstPanel();
+            recycled = true;
         }
 
-        this.applyOffset();
+        this.applyOffset(recycled);
     }
 
     recycleFirstPanel() {
@@ -715,7 +740,7 @@ export default class BackgroundManager {
         }
     }
 
-    applyOffset() {
+    applyOffset(force = false) {
         const roundedOffset =
             Math.round(
                 this.scrollOffset
@@ -727,6 +752,11 @@ export default class BackgroundManager {
          * fuera de pantalla: si se viera, el fondo se desvanecería
          * contra el vacío en el borde izquierdo.
          */
+        if (!force && roundedOffset === this.lastRoundedOffset) {
+            return;
+        }
+        this.lastRoundedOffset = roundedOffset;
+
         const baseX =
             -this.blendWidth -
             roundedOffset;
@@ -841,7 +871,7 @@ export default class BackgroundManager {
          * El resize no necesita lógica duplicada.
          * Se vuelven a calcular escala y posiciones.
          */
-        this.create();
+        this.create({ preserveScroll: true });
     }
 
     // =========================================================
@@ -908,6 +938,7 @@ export default class BackgroundManager {
         this.stepWidth = 0;
         this.scrollOffset = 0;
         this.sequenceIndex = 0;
+        this.lastRoundedOffset = null;
 
         this.scene = null;
     }

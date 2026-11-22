@@ -300,6 +300,8 @@ export default class GrappleController {
 
         this.hookId = null;
 
+        this.energy = configuration.energy ?? null;
+
         this.shurikenSystem =
             configuration.shurikenSystem ??
             null;
@@ -471,6 +473,14 @@ export default class GrappleController {
         const pressed =
             Boolean(controls?.grapple?.());
 
+        // Regeneración fuera de HOOKED y drenaje continuo colgado.
+        // Cuando la energía se agota, suelta el agarre inmediatamente.
+        const hasEnergy = this.energy?.update(delta, this.state === HOOKED) ?? true;
+        if (!hasEnergy && this.state === HOOKED) {
+            this.release(sprite, controls);
+            return;
+        }
+
         if (this.state === IDLE) {
             if (pressed) {
                 this.tryHook(sprite);
@@ -538,6 +548,7 @@ export default class GrappleController {
     // =========================================================
 
     tryHook(sprite) {
+        if (this.energy && !this.energy.canHook()) return false;
         const hook =
             this.findReachableHook(sprite);
 

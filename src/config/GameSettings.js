@@ -12,16 +12,7 @@ const GameSettings = {
     // =========================================================
 
     background: {
-        textureKeys: [
-            "background-1",
-            "background-2",
-            "background-3",
-            "background-4",
-            "background-5",
-            "background-6",
-            "background-7",
-            "background-8"
-        ],
+        textureKeys: ["background-1", "background-2", "background-3"],
 
         speed: 35,
         depth: -100,
@@ -113,6 +104,14 @@ const GameSettings = {
     // =========================================================
     // Jugador
     // =========================================================
+
+    energy: {
+        maximumSegments: 5,
+        // Colgado: gasta un segmento cada tres segundos.
+        drainMsPerSegment: 3000,
+        // Fuera del enganche: recupera uno cada 15 segundos.
+        regenerationMsPerSegment: 15000
+    },
 
     player: {
         walkSpeed: 250,
@@ -408,8 +407,8 @@ const GameSettings = {
 
     ui: {
         healthBar: {
-            playerWidth: 170,
-            playerHeight: 16,
+            playerWidth: 195,
+            playerHeight: 17,
 
             enemyWidth: 70,
             enemyHeight: 8

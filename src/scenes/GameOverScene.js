@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { createGameId } from "../utils/gameId.js";
 import { saveGameResult } from "../services/playerCloud.js";
 
 import HighScoreSystem
@@ -145,7 +146,7 @@ export default class GameOverScene extends Phaser.Scene {
 
         this.hasSavedScore =
             false;
-        this.cloudGameId = crypto.randomUUID();
+        this.cloudGameId = createGameId();
 
         this.isTransitioning =
             false;

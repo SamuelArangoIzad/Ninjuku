@@ -96,6 +96,23 @@ const BRANCH_ANCHORS = {
  * Margen a cada lado de la pantalla dentro del cual se mantiene visible
  * el objeto. Evita que aparezca de golpe justo en el borde.
  */
+// G1.7: anclajes sobre las ramas de la nueva panorámica de 3 tramos.
+// Coordenadas en píxeles de cada sección de 1800 x 900.
+const PANORAMA_ANCHORS = {
+    "background-1": [
+        { x: 360, y: 110 },
+        { x: 1320, y: 100 }
+    ],
+    "background-2": [
+        { x: 400, y: 120 },
+        { x: 1460, y: 105 }
+    ],
+    "background-3": [
+        { x: 380, y: 105 },
+        { x: 1450, y: 110 }
+    ]
+};
+
 const VISIBILITY_MARGIN = 400;
 
 /*
@@ -152,7 +169,7 @@ export default class HangingPropManager {
 
         this.anchors =
             configuration.anchors ??
-            BRANCH_ANCHORS;
+            PANORAMA_ANCHORS;
 
         /*
          * Reserva de imágenes reutilizables. Nunca se crean ni se

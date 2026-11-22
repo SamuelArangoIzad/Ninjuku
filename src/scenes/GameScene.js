@@ -1,4 +1,7 @@
 import Phaser from "phaser";
+import GameSettings from "../config/GameSettings.js";
+import EnergyComponent from "../components/EnergyComponent.js";
+import SegmentedHUDBar from "../ui/SegmentedHUDBar.js";
 
 import AnimationController
     from "../entities/AnimationController.js";
@@ -75,16 +78,7 @@ import ScoreSystem
  * Orden en el que se van encadenando los fondos. Al llegar al final
  * vuelve a empezar por el primero.
  */
-const BACKGROUND_KEYS = [
-    "background-1",
-    "background-2",
-    "background-3",
-    "background-4",
-    "background-5",
-    "background-6",
-    "background-7",
-    "background-8"
-];
+const BACKGROUND_KEYS = ["background-1", "background-2", "background-3"];
 
 
 /*
@@ -394,49 +388,14 @@ export default class GameScene extends Phaser.Scene {
     // =========================================================
 
     loadBackgroundAssets() {
-        /*
-         * Los fondos se recorren en secuencia. Para añadir el fondo 3
-         * basta con cargarlo aquí y sumar su clave a BACKGROUND_KEYS.
-         */
-        this.load.image(
-            "background-1",
-            "/assets/backgrounds/fondo.png"
-        );
-
-        this.load.image(
-            "background-2",
-            "/assets/backgrounds/fondo2.png"
-        );
-
-        this.load.image(
-            "background-3",
-            "/assets/backgrounds/fondo3.png"
-        );
-
-        this.load.image(
-            "background-4",
-            "/assets/backgrounds/fondo4.png"
-        );
-
-        this.load.image(
-            "background-5",
-            "/assets/backgrounds/fondo5.png"
-        );
-
-        this.load.image(
-            "background-6",
-            "/assets/backgrounds/fondo6.png"
-        );
-
-        this.load.image(
-            "background-7",
-            "/assets/backgrounds/fondo7.png"
-        );
-
-        this.load.image(
-            "background-8",
-            "/assets/backgrounds/fondo8.png"
-        );
+        // G1.7: tres segmentos contiguos de un mismo arte panorámico.
+        // El archivo maestro no se carga durante la partida.
+        for (let index = 1; index <= 3; index += 1) {
+            this.load.image(
+                `background-${index}`,
+                `/assets/backgrounds/panorama/panorama${index}.webp`
+            );
+        }
     }
 
     // =========================================================
@@ -1125,7 +1084,10 @@ export default class GameScene extends Phaser.Scene {
                         35,
 
                     depth:
-                        -100
+                        -100,
+
+                    // PNG conectados a borde: sin mezcla de paneles.
+                    seamlessTiles: true
                 }
             );
 
@@ -1605,6 +1567,13 @@ export default class GameScene extends Phaser.Scene {
 
         this.dragonPickup.create();
 
+        this.energy = new EnergyComponent(GameSettings.energy);
+        this.energyBar = new SegmentedHUDBar(this, {
+            x: 29, y: 115, width: 195, height: 17,
+            segments: this.energy.maximumSegments, kind: "energy"
+        });
+        this.energyBar.handleResize(this.scale.gameSize);
+
         this.grappleController =
             new GrappleController(
                 this,
@@ -1616,7 +1585,8 @@ export default class GameScene extends Phaser.Scene {
                         this.hookRegistry,
 
                     shurikenSystem:
-                        this.shurikenSystem
+                        this.shurikenSystem,
+                    energy: this.energy
                 }
             );
 
@@ -1941,6 +1911,8 @@ export default class GameScene extends Phaser.Scene {
                 delta,
                 this.controls
             );
+
+        this.energyBar?.setPercentage(this.energy?.getPercentage() ?? 1);
 
         this.roofEnemyManager
             ?.update(delta, time);
@@ -2464,6 +2436,8 @@ export default class GameScene extends Phaser.Scene {
                 resizeData
             );
 
+        this.energyBar?.handleResize(resizeData);
+
         this.scoreSystem
             ?.handleResize?.(
                 resizeData
@@ -2739,6 +2713,10 @@ export default class GameScene extends Phaser.Scene {
 
         this.obstacleManager =
             null;
+
+        this.energyBar?.destroy();
+        this.energyBar = null;
+        this.energy = null;
 
         this.grappleController
             ?.destroy();

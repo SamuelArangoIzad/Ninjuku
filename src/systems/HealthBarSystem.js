@@ -1,5 +1,6 @@
 import HealthBar
     from "../ui/HealthBar.js";
+import SegmentedHUDBar from "../ui/SegmentedHUDBar.js";
 
 
 export default class HealthBarSystem {
@@ -23,7 +24,7 @@ export default class HealthBarSystem {
                 1,
                 Number(
                     configuration.playerWidth
-                ) || 170
+                ) || 195
             );
 
         this.playerBarHeight =
@@ -31,7 +32,7 @@ export default class HealthBarSystem {
                 1,
                 Number(
                     configuration.playerHeight
-                ) || 16
+                ) || 17
             );
 
         this.enemyBarWidth =
@@ -129,14 +130,14 @@ export default class HealthBarSystem {
         }
 
         this.playerBar =
-            new HealthBar(
+            new SegmentedHUDBar(
                 this.scene,
                 {
                     x:
-                        24,
+                        29,
 
                     y:
-                        24,
+                        47,
 
                     width:
                         this.playerBarWidth,
@@ -151,10 +152,13 @@ export default class HealthBarSystem {
                         3000,
 
                     visible:
-                        true
+                        true,
+                    kind: "health",
+                    segments: this.player?.getHealthComponent?.()?.getMaximumHealth?.() ?? 5
                 }
             );
 
+        this.playerBar?.handleResize(this.scene.scale.gameSize);
         this.updatePlayerPercentage();
 
         return true;
@@ -649,11 +653,7 @@ export default class HealthBarSystem {
          * La barra está fijada a la cámara; solo conserva
          * su margen superior izquierdo.
          */
-        this.playerBar
-            ?.setPosition(
-                24,
-                24
-            );
+        this.playerBar?.handleResize(this.scene?.scale?.gameSize);
 
         /*
          * Fuerza una comprobación de cámara en el próximo
